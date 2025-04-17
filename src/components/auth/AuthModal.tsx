@@ -482,86 +482,88 @@ export default function AuthModal({ isOpen, onClose, disableClose }: Props) {
   return (
     <Dialog.Root open={isOpen} onOpenChange={disableClose ? undefined : onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay
-          as={motion.div}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        />
-        <Dialog.Content
-          as={motion.div}
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.2 }}
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[900px] grid grid-cols-1 md:grid-cols-2 bg-[#01040B]/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/10"
-        >
-          {/* Left Side - Form */}
-          <div className="p-8">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 bg-red-500/10 text-red-500 p-4 rounded-lg mb-6"
-              >
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </motion.div>
-            )}
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full w-full"
+          />
+        </Dialog.Overlay>
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[900px] grid grid-cols-1 md:grid-cols-2 bg-[#01040B]/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2 }}
+            className="h-full w-full"
+          >
+            {/* Left Side - Form */}
+            <div className="p-8">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 bg-red-500/10 text-red-500 p-4 rounded-lg mb-6"
+                >
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p>{error}</p>
+                </motion.div>
+              )}
 
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 bg-green-500/10 text-green-500 p-4 rounded-lg mb-6"
-              >
-                <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{success}</p>
-              </motion.div>
-            )}
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 bg-green-500/10 text-green-500 p-4 rounded-lg mb-6"
+                >
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <p>{success}</p>
+                </motion.div>
+              )}
 
-            <AnimatePresence mode="wait" initial={false}>
-              {renderAuthForm()}
-            </AnimatePresence>
-          </div>
-
-          {/* Right Side - Features */}
-          <div className="hidden md:block relative">
-            <img
-              src="https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=2070"
-              alt="Content Creator workspace"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-[#01040B]/90 to-[#01040B]/50" />
-            <div className="relative h-full flex flex-col justify-center p-8">
-              <h2 className="text-3xl font-bold mb-4">Grow Your YouTube Channel</h2>
-              <p className="text-gray-300 mb-8">
-                Join thousands of content creators using our AI-powered tools to grow their audience
-                and create better content.
-              </p>
-              <ul className="space-y-4">
-                <li className="flex items-center gap-3 text-gray-300">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                    <BarChart2 className="w-5 h-5" />
-                  </div>
-                  <span>Advanced analytics and insights</span>
-                </li>
-                <li className="flex items-center gap-3 text-gray-300">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                    <Lightbulb className="w-5 h-5" />
-                  </div>
-                  <span>AI-powered content suggestions</span>
-                </li>
-                <li className="flex items-center gap-3 text-gray-300">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                    <Search className="w-5 h-5" />
-                  </div>
-                  <span>SEO optimization tools</span>
-                </li>
-              </ul>
+              <AnimatePresence mode="wait" initial={false}>
+                {renderAuthForm()}
+              </AnimatePresence>
             </div>
-          </div>
+
+            {/* Right Side - Features */}
+            <div className="hidden md:block relative">
+              <img
+                src="https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=2070"
+                alt="Content Creator workspace"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#01040B]/90 to-[#01040B]/50" />
+              <div className="relative h-full flex flex-col justify-center p-8">
+                <h2 className="text-3xl font-bold mb-4">Grow Your YouTube Channel</h2>
+                <p className="text-gray-300 mb-8">
+                  Join thousands of content creators using our AI-powered tools to grow their audience
+                  and create better content.
+                </p>
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3 text-gray-300">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <BarChart2 className="w-5 h-5" />
+                    </div>
+                    <span>Advanced analytics and insights</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-gray-300">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <Lightbulb className="w-5 h-5" />
+                    </div>
+                    <span>AI-powered content suggestions</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-gray-300">
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <Search className="w-5 h-5" />
+                    </div>
+                    <span>SEO optimization tools</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </motion.div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
