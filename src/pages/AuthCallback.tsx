@@ -10,9 +10,21 @@ export default function AuthCallback() {
     // Get the URL hash for auth redirect response
     const handleAuthRedirect = async () => {
       try {
-        // Parse the URL to check if it's a password reset or email confirmation
-        const url = new URL(window.location.href);
-        const isPasswordReset = url.hash.includes('type=recovery');
+        // Parse the URL hash parameters
+        const hashParams = window.location.hash
+          .substring(1)
+          .split('&')
+          .reduce((params, param) => {
+            const [key, value] = param.split('=');
+            params[key] = value;
+            return params;
+          }, {} as Record<string, string>);
+
+        console.log('Auth callback URL hash params:', hashParams);
+        
+        // Check for specific types
+        const type = hashParams.type;
+        const accessToken = hashParams.access_token;
         
         // Process Supabase auth callback
         const { data, error } = await supabase.auth.getSession();
@@ -24,21 +36,28 @@ export default function AuthCallback() {
           return;
         }
         
-        console.log('Session data:', data);
+        console.log('Auth callback session data:', data);
         
-        // If it's a password reset, redirect to reset-password page
-        if (isPasswordReset) {
-          console.log('Password reset detected, redirecting to reset-password');
+        // Handle different auth scenarios
+        if (type === 'recovery' || window.location.href.includes('reset-password')) {
+          console.log('Password reset flow detected, redirecting to reset-password');
           navigate('/reset-password', { replace: true });
-        } else {
-          // Otherwise it's an email confirmation, redirect to dashboard if logged in, or home if not
+        } else if (type === 'signup' || type === 'email_confirmation') {
+          console.log('Email confirmation flow detected');
+          // If the user has a valid session, redirect to dashboard, otherwise to login
           if (data?.session?.user) {
-            console.log('User is logged in, redirecting to dashboard');
+            console.log('User has valid session, redirecting to dashboard');
             navigate('/dashboard', { replace: true });
           } else {
-            console.log('No user session, redirecting to home page');
-            navigate('/', { replace: true });
+            console.log('Email confirmed but no session, redirecting to login');
+            navigate('/login', { replace: true });
           }
+        } else if (accessToken || data?.session?.access_token) {
+          console.log('Access token detected, redirecting to dashboard');
+          navigate('/dashboard', { replace: true });
+        } else {
+          console.log('No specific auth flow detected, redirecting to home page');
+          navigate('/', { replace: true });
         }
       } catch (err) {
         console.error('Auth redirect error:', err);

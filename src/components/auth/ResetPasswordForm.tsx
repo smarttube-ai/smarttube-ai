@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AlertCircle, Youtube, CheckCircle, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -12,26 +12,61 @@ export default function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Check if we have a hash fragment in the URL (Supabase adds this for password reset)
   useEffect(() => {
-    const handleHashChange = async () => {
+    const validateResetToken = async () => {
       try {
+        // Extract token from URL if present
+        const urlParams = new URLSearchParams(location.search);
+        const token = urlParams.get('token') || 
+                      (location.hash && location.hash.match(/access_token=([^&]*)/)?.[1]);
+        
+        console.log('Reset password token check:', { 
+          search: location.search,
+          hash: location.hash,
+          token: token ? 'found' : 'not found' 
+        });
+        
         // The hash params are automatically handled by Supabase auth
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('Error getting session for password reset:', error);
           setError('Unable to verify your reset link. Please try requesting a new password reset.');
           return;
         }
         
-        console.log('Session data:', data);
+        console.log('Password reset session data:', data);
         
         // If no active session with access token, redirect to forgot password
         if (!data?.session?.access_token) {
-          console.log('No active session, redirecting to forgot-password');
-          navigate('/forgot-password');
+          console.log('No active session for password reset, redirecting to forgot-password');
+          
+          // If there's an explicit token in the URL, try to use it
+          if (token) {
+            try {
+              // Try to parse the token and exchange it for a session
+              const { error: verifyError } = await supabase.auth.verifyOtp({
+                token_hash: token,
+                type: 'recovery'
+              });
+              
+              if (verifyError) {
+                console.error('Token verification error:', verifyError);
+                setError('Your password reset link has expired or is invalid. Please request a new one.');
+                setTimeout(() => navigate('/forgot-password'), 3000);
+              }
+            } catch (verifyErr) {
+              console.error('Token verification exception:', verifyErr);
+              setError('There was a problem with your reset link. Please request a new one.');
+              setTimeout(() => navigate('/forgot-password'), 3000);
+            }
+          } else {
+            setError('No valid reset token found. Please request a new password reset.');
+            setTimeout(() => navigate('/forgot-password'), 3000);
+          }
         }
       } catch (err) {
         console.error('Session check error:', err);
@@ -39,8 +74,8 @@ export default function ResetPasswordForm() {
       }
     };
 
-    handleHashChange();
-  }, [navigate]);
+    validateResetToken();
+  }, [navigate, location]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -83,9 +118,9 @@ export default function ResetPasswordForm() {
       // Show success message
       setSuccess(true);
       
-      // Redirect to dashboard after 3 seconds
+      // Redirect to login after 3 seconds
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/login');
       }, 3000);
     } catch (err) {
       console.error('Password update exception:', err);
@@ -123,7 +158,7 @@ export default function ResetPasswordForm() {
             <CheckCircle className="w-12 h-12" />
             <h3 className="text-xl font-semibold text-center">Password Reset Successful</h3>
             <p className="text-center text-gray-400">
-              Your password has been successfully reset. You'll be redirected to your dashboard in a moment.
+              Your password has been successfully reset. You'll be redirected to the login page in a moment.
             </p>
           </div>
         ) : (

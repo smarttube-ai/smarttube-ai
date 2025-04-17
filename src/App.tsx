@@ -56,7 +56,7 @@ function App() {
             {/* Auth callback route */}
             <Route path="/auth/callback" element={<AuthCallback />} />
             
-            {/* 404 page - this will catch all unmatched routes */}
+            {/* 404 page - this must be the last route to catch all unmatched paths */}
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BackToTop />
