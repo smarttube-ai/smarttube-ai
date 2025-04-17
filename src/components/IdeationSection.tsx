@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Copy,
   Download,
   FileDown,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   Lightbulb,
-  Sparkles,
-  Target,
-  TrendingUp,
-  Users,
 } from 'lucide-react';
 import { getApiKey } from '../lib/openrouter';
-import { useNavigate } from 'react-router-dom';
 
 export default function IdeationSection() {
   const [channelUrl, setChannelUrl] = useState('');
@@ -21,14 +15,6 @@ export default function IdeationSection() {
   const [error, setError] = useState<string | null>(null);
   const [ideaResponse, setIdeaResponse] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const navigate = useNavigate();
-  
-  // Use effect to attach event listeners when ideaResponse changes
-  useEffect(() => {
-    if (ideaResponse) {
-      attachScriptButtonListeners();
-    }
-  }, [ideaResponse]);
 
   // Function to validate YouTube channel URL
   const isValidYouTubeUrl = (url: string): boolean => {
@@ -103,7 +89,7 @@ Also, below each idea, add a simple call-to-action text:
       // Try with a different model that's known to work with OpenRouter
       // OpenRouter supports various models, let's use a reliable one
       const request = {
-        model: "openai/gpt-3.5-turbo", // Using a more reliable model as fallback
+        model: "deepseek/deepseek-r1-zero:free",
         temperature: 0.7,
         messages: [userMessage],
         max_tokens: 1500
@@ -119,8 +105,7 @@ Also, below each idea, add a simple call-to-action text:
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': window.location.origin,
-          'X-Title': 'SmartTube AI',
-          'OpenAI-Organization': 'org-dummy' // Required by some API providers
+          'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify(request)
       });
@@ -140,7 +125,13 @@ Also, below each idea, add a simple call-to-action text:
       
       // Get the content from the API response
       const content = data.choices[0].message.content;
-      setIdeaResponse(content);
+      // Clean up the content by removing \boxed{, ---, and } characters
+      const cleanContent = content
+        .replace(/\\boxed\{/g, '')
+        .replace(/^---/gm, '')
+        .replace(/\}$/g, '')
+        .trim();
+      setIdeaResponse(cleanContent);
     } catch (err: any) {
       console.error('Error generating video idea:', err);
       
@@ -191,33 +182,6 @@ Also, below each idea, add a simple call-to-action text:
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-  };
-  
-  const handleScriptGeneration = (title: string) => {
-    // Navigate to the scripting section with the title pre-filled
-    navigate('/dashboard/scripting', { state: { title } });
-  };
-  
-  // Function to attach event listeners to script buttons
-  const attachScriptButtonListeners = () => {
-    setTimeout(() => {
-      const buttons = document.querySelectorAll('.write-script-btn');
-      buttons.forEach((button) => {
-        button.addEventListener('click', (e) => {
-          const target = e.target as HTMLElement;
-          const parentDiv = target.closest('div');
-          if (parentDiv) {
-            const titleElement = parentDiv.querySelector('h4[data-title]');
-            if (titleElement) {
-              const title = titleElement.getAttribute('data-title');
-              if (title) {
-                handleScriptGeneration(title);
-              }
-            }
-          }
-        });
-      });
-    }, 100);
   };
 
   return (
@@ -287,18 +251,21 @@ Also, below each idea, add a simple call-to-action text:
             </div>
 
             <div className="space-y-6 idea-content">
-              <div 
-                className="prose max-w-none" 
-                dangerouslySetInnerHTML={{ 
-                  __html: ideaResponse
-                    .replace(/\n/g, '<br>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/🎯/g, '<span class="text-primary text-xl">🎯</span>')
-                    .replace(/Title: (.*?)\n/g, '<h4 class="text-lg font-semibold mb-1" data-title="$1">$1</h4>')
-                    .replace(/Summary: (.*?)(?=\n→|$)/gs, '<p class="mb-3">$1</p>')
-                    .replace(/→ Button: "Write Script for This Video"/g, '<button class="button button-primary mt-2 write-script-btn">Write Script for This Video</button>')
-                }}
-              />
+              {ideaResponse.split('🎯').filter(idea => idea.trim()).map((idea, index) => (
+                <div key={index} className="idea-card card p-6 bg-gray-800/50 rounded-lg hover:bg-gray-800/70 transition-colors">
+                  <div 
+                    className="prose max-w-none" 
+                    dangerouslySetInnerHTML={{ 
+                      __html: idea
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/Title: (.*?)\n/g, '<h4 class="text-lg font-semibold mb-1">$1</h4>')
+                        .replace(/Summary: (.*?)(?=\n→|$)/gs, '<p class="mb-3">$1</p>')
+                        .replace(/→ Button: "Write Script for This Video"/g, '')
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>

@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Copy, Download, FileDown, AlertCircle, Loader2 } from 'lucide-react';
 import { generateScript } from '../lib/openrouter';
+import { useLocation } from 'react-router-dom';
 
 export default function ScriptingSection() {
+  const location = useLocation();
+  const navigationState = location.state as { 
+    title?: string;
+    keywords?: string;
+    audienceType?: string;
+    videoLength?: string;
+    contentType?: string;
+  } | null;
+
   const contentTypes = [
     'Informative',
     'Tutorial',
@@ -23,6 +33,16 @@ export default function ScriptingSection() {
     videoLength: '',
     contentType: contentTypes[0]
   });
+
+  // Effect to handle navigation state
+  useEffect(() => {
+    if (navigationState) {
+      setScriptData(prev => ({
+        ...prev,
+        ...navigationState
+      }));
+    }
+  }, [navigationState]);
 
   const [generatedScript, setGeneratedScript] = useState('');
   const [isLoading, setIsLoading] = useState(false);
