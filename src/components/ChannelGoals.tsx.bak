@@ -1,0 +1,364 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Target, Calendar, Trophy, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
+import confetti from 'canvas-confetti';
+
+// Types
+interface Goal {
+  id: string;
+  user_id: string;
+  title: string;
+  category: 'Content' | 'Growth' | 'Engagement' | 'Monetization';
+  target_value: number;
+  deadline: string | null;
+  progress: number;
+  status: 'pending' | 'completed';
+  created_at: string;
+  completed_at: string | null;
+}
+
+interface Badge {
+  badge_id: string;
+  user_id: string;
+  badge_name: string;
+  awarded_at: string;
+}
+
+export default function ChannelGoals() {
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [xp, setXp] = useState(0);
+  const [level, setLevel] = useState(0);
+  const [newGoal, setNewGoal] = useState({
+    title: '',
+    category: 'Content',
+    target_value: 0,
+    deadline: '',
+  });
+
+  // Fetch user's goals and badges
+  useEffect(() => {
+    if (user) {
+      fetchGoals();
+      fetchBadges();
+    }
+  }, [user]);
+
+  // Calculate XP and Level
+  useEffect(() => {
+    const completedGoals = goals.filter(goal => goal.status === 'completed').length;
+    const calculatedXp = completedGoals * 50;
+    setXp(calculatedXp);
+    setLevel(Math.floor(calculatedXp / 100));
+  }, [goals]);
+
+  const fetchGoals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setGoals(data || []);
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    }
+  };
+
+  const fetchBadges = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_badges')
+        .select('*')
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setBadges(data || []);
+    } catch (error) {
+      console.error('Error fetching badges:', error);
+    }
+  };
+
+  const handleAddGoal = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_goals')
+        .insert([
+          {
+            user_id: user?.id,
+            ...newGoal,
+            progress: 0,
+            status: 'pending',
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setGoals([data, ...goals]);
+      setIsModalOpen(false);
+      setNewGoal({ title: '', category: 'Content', target_value: 0, deadline: '' });
+    } catch (error) {
+      console.error('Error adding goal:', error);
+    }
+  };
+
+  const updateGoalProgress = async (goalId: string, progress: number) => {
+    try {
+      const { error } = await supabase
+        .from('user_goals')
+        .update({ progress })
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      setGoals(goals.map(goal => 
+        goal.id === goalId ? { ...goal, progress } : goal
+      ));
+    } catch (error) {
+      console.error('Error updating goal progress:', error);
+    }
+  };
+
+  const completeGoal = async (goalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_goals')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          progress: 100
+        })
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      setGoals(goals.map(goal =>
+        goal.id === goalId
+          ? { ...goal, status: 'completed', completed_at: new Date().toISOString(), progress: 100 }
+          : goal
+      ));
+
+      // Trigger confetti animation
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    } catch (error) {
+      console.error('Error completing goal:', error);
+    }
+  };
+
+  const deleteGoal = async (goalId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_goals')
+        .delete()
+        .eq('id', goalId);
+
+      if (error) throw error;
+
+      setGoals(goals.filter(goal => goal.id !== goalId));
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-8">
+      {/* Welcome Section */}
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-[#2762EB] to-[#9333EA]">
+        <h1 className="text-3xl font-bold text-white mb-2">Channel Goals</h1>
+        <p className="text-white/90">Track Your YouTube Journey</p>
+      </div>
+
+      {/* User Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-6 rounded-xl bg-white/5 border border-white/10">
+          <h3 className="text-lg font-semibold mb-2">XP Progress</h3>
+          <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-[#2762EB] to-[#9333EA]"
+              style={{ width: `${(xp % 100)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-gray-400">Level {level}</p>
+        </div>
+        <div className="p-6 rounded-xl bg-white/5 border border-white/10">
+          <h3 className="text-lg font-semibold mb-2">Goals Completed</h3>
+          <p className="text-2xl font-bold text-[#2762EB]">
+            {goals.filter(goal => goal.status === 'completed').length}
+          </p>
+        </div>
+        <div className="p-6 rounded-xl bg-white/5 border border-white/10">
+          <h3 className="text-lg font-semibold mb-2">Badges Earned</h3>
+          <div className="flex flex-wrap gap-2">
+            {badges.map(badge => (
+              <span
+                key={badge.badge_id}
+                className="px-3 py-1 rounded-full text-sm bg-white/10"
+              >
+                {badge.badge_name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Goal Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 rounded-lg bg-[#2762EB] text-white flex items-center space-x-2 hover:bg-[#2762EB]/90 transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Add New Goal</span>
+        </button>
+      </div>
+
+      {/* Goals List */}
+      <div className="grid grid-cols-1 gap-6">
+        {goals.map(goal => (
+          <motion.div
+            key={goal.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-6 rounded-xl bg-white/5 border border-white/10"
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">{goal.title}</h3>
+                <span className="inline-block px-3 py-1 rounded-full text-sm bg-white/10 mt-2">
+                  {goal.category}
+                </span>
+                {goal.deadline && (
+                  <p className="text-sm text-gray-400 mt-2">
+                    Deadline: {new Date(goal.deadline).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                {goal.status === 'pending' && (
+                  <button
+                    onClick={() => completeGoal(goal.id)}
+                    className="p-2 rounded-lg bg-green-500/20 text-green-500 hover:bg-green-500/30 transition-colors"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => deleteGoal(goal.id)}
+                  className="p-2 rounded-lg bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">Progress</span>
+                <span className="text-sm font-medium">{goal.progress}%</span>
+              </div>
+              <input
+                type="range"
+                value={goal.progress}
+                onChange={(e) => updateGoalProgress(goal.id, parseInt(e.target.value))}
+                min="0"
+                max="100"
+                className="w-full"
+                disabled={goal.status === 'completed'}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Add Goal Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-[#0B1120] p-6 rounded-xl w-full max-w-md border border-white/10"
+            >
+              <h2 className="text-xl font-semibold mb-4">Add New Goal</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Goal Title</label>
+                  <input
+                    type="text"
+                    value={newGoal.title}
+                    onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-[#2762EB]"
+                    placeholder="Enter goal title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Category</label>
+                  <select
+                    value={newGoal.category}
+                    onChange={(e) => setNewGoal({ ...newGoal, category: e.target.value as Goal['category'] })}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-[#2762EB]"
+                  >
+                    <option value="Content">Content</option>
+                    <option value="Growth">Growth</option>
+                    <option value="Engagement">Engagement</option>
+                    <option value="Monetization">Monetization</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Target Value</label>
+                  <input
+                    type="number"
+                    value={newGoal.target_value}
+                    onChange={(e) => setNewGoal({ ...newGoal, target_value: parseInt(e.target.value) })}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-[#2762EB]"
+                    placeholder="Enter target number"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Deadline (Optional)</label>
+                  <input
+                    type="date"
+                    value={newGoal.deadline}
+                    onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 focus:outline-none focus:border-[#2762EB]"
+                  />
+                </div>
+                <div className="flex space-x-4 pt-4">
+                  <button
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddGoal}
+                    className="flex-1 px-4 py-2 rounded-lg bg-[#2762EB] text-white hover:bg-[#2762EB]/90 transition-colors"
+                  >
+                    Add Goal
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
