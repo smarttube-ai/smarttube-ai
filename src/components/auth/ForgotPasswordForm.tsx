@@ -24,7 +24,7 @@ export default function ForgotPasswordForm() {
     try {
       // Send password reset email using Supabase
       const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `https://smarttube-ai.vercel.app/auth/callback`,
       });
 
       if (resetError) {

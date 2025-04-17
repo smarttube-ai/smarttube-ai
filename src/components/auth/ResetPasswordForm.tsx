@@ -83,9 +83,9 @@ export default function ResetPasswordForm() {
       // Show success message
       setSuccess(true);
       
-      // Redirect to login after 3 seconds
+      // Redirect to dashboard after 3 seconds
       setTimeout(() => {
-        navigate('/login');
+        navigate('/dashboard');
       }, 3000);
     } catch (err) {
       console.error('Password update exception:', err);
@@ -123,7 +123,7 @@ export default function ResetPasswordForm() {
             <CheckCircle className="w-12 h-12" />
             <h3 className="text-xl font-semibold text-center">Password Reset Successful</h3>
             <p className="text-center text-gray-400">
-              Your password has been successfully reset. You'll be redirected to the login page in a moment.
+              Your password has been successfully reset. You'll be redirected to your dashboard in a moment.
             </p>
           </div>
         ) : (

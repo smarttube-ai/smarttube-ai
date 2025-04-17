@@ -89,7 +89,7 @@ export default function AuthModal({ isOpen, onClose, disableClose }: Props) {
         case 'forgot-email':
           const { error: resetError } = await supabase.auth.resetPasswordForEmail(
             formData.email,
-            { redirectTo: `${window.location.origin}/auth/callback` }
+            { redirectTo: `https://smarttube-ai.vercel.app/auth/callback` }
           );
           if (resetError) throw resetError;
           setSuccess('Password reset instructions sent to your email');
