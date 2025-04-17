@@ -76,7 +76,7 @@ export default function AuthModal({ isOpen, onClose, disableClose }: Props) {
               data: {
                 full_name: formData.fullName,
               },
-              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              emailRedirectTo: `https://smarttube-ai.vercel.app/auth/callback`,
             },
           });
           

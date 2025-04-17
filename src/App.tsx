@@ -13,6 +13,7 @@ const TermsAndConditions = React.lazy(() => import('./pages/TermsAndConditions')
 const NotFound = React.lazy(() => import('./pages/NotFound'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const AuthCallback = React.lazy(() => import('./pages/AuthCallback'));
 
 function App() {
   const { user } = useAuth();
@@ -49,6 +50,10 @@ function App() {
             />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+            
+            {/* Auth callback route */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            
             {/* 404 page - this will catch all unmatched routes */}
             <Route path="*" element={<NotFound />} />
           </Routes>

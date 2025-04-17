@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    { "source": "/auth/callback", "destination": "/" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "redirects": [
+    { "source": "/auth/callback", "destination": "/", "permanent": false }
+  ],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html", "status": 200 }
+  ]
+} 
