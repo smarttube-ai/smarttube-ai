@@ -2,6 +2,8 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import BackToTop from './components/BackToTop';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const LandingPage = React.lazy(() => import('./components/landing/LandingPage'));
@@ -58,6 +60,8 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BackToTop />
+          <Analytics />
+          <SpeedInsights />
         </Suspense>
       </div>
     </Router>
