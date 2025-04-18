@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Download, 
   AlertCircle, 
@@ -6,7 +6,8 @@ import {
   Music, 
   Check, 
   ChevronDown,
-  Loader
+  Loader,
+  PlayCircle
 } from 'lucide-react';
 import { VideoData } from '../../types/youtube';
 
@@ -27,8 +28,7 @@ export default function VideoDownload({ videoData, videoId }: VideoDownloadProps
   const [audioOnly, setAudioOnly] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [downloadReady, setDownloadReady] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Available qualities based on format
   const availableQualities: VideoQuality[] = selectedFormat === 'mp4' 
@@ -47,124 +47,18 @@ export default function VideoDownload({ videoData, videoId }: VideoDownloadProps
 
   // Reset download state when changing options
   useEffect(() => {
-    setDownloadReady(false);
     setDownloadUrl(null);
-    setVideoReady(false);
+    setShowPreview(false);
   }, [selectedQuality, selectedFormat, audioOnly]);
 
-  // Function to create a larger dummy file for download simulation
-  const createDummyFile = (videoTitle: string, format: VideoFormat): Blob => {
-    // Create a base content
-    let content = `SmartTube AI - Downloaded Video
-    
-Video ID: ${videoId}
-Title: ${videoTitle}
-Format: ${format.toUpperCase()}
-Quality: ${selectedQuality}
-Audio Only: ${audioOnly ? 'Yes' : 'No'}
-Download Date: ${new Date().toLocaleString()}
+  // Prepare the YouTube embed URL
+  const prepareEmbedUrl = useCallback(() => {
+    if (!videoId) return null;
+    return `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=0&controls=1&origin=${window.location.origin}`;
+  }, [videoId]);
 
-This is a simulated download from SmartTube AI.
-In a production environment, this would be the actual video content.
-`;
-
-    // Get the estimated size based on quality and format
-    const estimatedSize = getEstimatedSizeInBytes(selectedQuality, format, audioOnly);
-    
-    // Pad the content to reach the estimated size
-    // Each character is approximately 1 byte
-    const paddingNeeded = Math.max(0, estimatedSize - content.length);
-    
-    // Add padding data to simulate actual file size
-    if (paddingNeeded > 0) {
-      // Create a buffer of random data to pad the file
-      const padding = Array(paddingNeeded).fill(0).map(() => 
-        String.fromCharCode(Math.floor(Math.random() * 26) + 97)
-      ).join('');
-      
-      content += `\n\n${padding}`;
-    }
-
-    // Create a blob with the content and appropriate MIME type
-    return new Blob([content], { 
-      type: format === 'mp4' ? 'video/mp4' : 'audio/mpeg' 
-    });
-  };
-
-  // Function to get estimated size in bytes based on quality and format
-  const getEstimatedSizeInBytes = (quality: VideoQuality, format: VideoFormat, audioOnly: boolean): number => {
-    // Sizes in MB
-    const sizesMB: Record<VideoQuality, number> = {
-      '144p': 5,
-      '240p': 10,
-      '360p': 20,
-      '480p': 35,
-      '720p': 70,
-      '1080p': 120
-    };
-
-    let sizeMB = sizesMB[quality];
-    
-    if (format === 'mp3' || audioOnly) {
-      sizeMB = Math.floor(sizeMB * 0.15);
-    }
-    
-    // Convert MB to bytes (1 MB = 1,048,576 bytes)
-    return sizeMB * 1048576;
-  };
-
-  const handleDownload = async () => {
-    if (downloadReady && videoData) {
-      try {
-        setDownloading(true);
-        
-        // Create a dummy file for download simulation with appropriate size
-        const blob = createDummyFile(videoData.title, selectedFormat);
-        
-        // Create a blob URL and trigger download
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `SmartTube AI - Downloaded Video.${selectedFormat}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up the blob URL
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        setDownloading(false);
-      } catch (err) {
-        setError('Download failed. Please try again.');
-        setDownloading(false);
-      }
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setDownloadReady(false);
-    setVideoReady(false);
-
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Get the YouTube video embed URL for preview
-      // Add autoplay=1 and other parameters to ensure video plays automatically
-      const youtubeEmbedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&origin=${window.location.origin}`;
-      
-      // Set the embed URL for preview
-      setDownloadUrl(youtubeEmbedUrl);
-      setDownloadReady(true);
-      setVideoReady(true);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to prepare download. Please try again.');
-      setLoading(false);
-    }
-  };
-
-  const formatFileSize = (quality: VideoQuality, format: VideoFormat, audioOnly: boolean): string => {
+  // Function to get estimated size based on quality and format
+  const getEstimatedSize = (quality: VideoQuality, format: VideoFormat, audioOnly: boolean): string => {
     // Simulated file sizes based on quality and format
     const sizes: Record<VideoQuality, number> = {
       '144p': 5,
@@ -184,6 +78,63 @@ In a production environment, this would be the actual video content.
     return `~${size} MB`;
   };
 
+  const handlePlayPreview = () => {
+    setShowPreview(true);
+    const embedUrl = prepareEmbedUrl();
+    if (embedUrl) {
+      // Update the URL to autoplay when preview is shown
+      setDownloadUrl(embedUrl.replace('autoplay=0', 'autoplay=1'));
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      setError(null);
+      
+      // Create a small placeholder file instead of a large dummy file
+      const placeholderContent = `SmartTube AI - Downloaded Video
+      
+Video ID: ${videoId}
+Title: ${videoData?.title || 'YouTube Video'}
+Format: ${selectedFormat.toUpperCase()}
+Quality: ${selectedQuality}
+Audio Only: ${audioOnly ? 'Yes' : 'No'}
+Download Date: ${new Date().toLocaleString()}
+
+This is a simulated download from SmartTube AI.
+`;
+      
+      // Create a blob with a small content
+      const blob = new Blob([placeholderContent], { 
+        type: selectedFormat === 'mp4' ? 'video/mp4' : 'audio/mpeg' 
+      });
+      
+      // Prepare filename
+      let filename = videoData?.title || 'YouTube Video';
+      // Replace invalid filename characters
+      filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
+      
+      // Create a blob URL and trigger download
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${filename}.${selectedFormat}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL immediately
+      URL.revokeObjectURL(blobUrl);
+      
+      // Finish downloading
+      setDownloading(false);
+    } catch (err) {
+      setError('Download failed. Please try again.');
+      setDownloading(false);
+    }
+  };
+
   if (!videoData || !videoId) {
     return (
       <div className="flex items-center gap-2 text-yellow-500 bg-yellow-500/10 p-4 rounded-lg">
@@ -200,13 +151,23 @@ In a production environment, this would be the actual video content.
         <h3 className="text-lg font-semibold mb-4">Video Preview</h3>
         
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="w-full md:w-1/3">
+          <div className="w-full md:w-1/3 relative group cursor-pointer" onClick={handlePlayPreview}>
             {videoData.thumbnails && (
-              <img 
-                src={videoData.thumbnails.medium?.url || videoData.thumbnails.default?.url} 
-                alt={videoData.title} 
-                className="w-full h-auto rounded-lg"
-              />
+              <>
+                <img 
+                  src={videoData.thumbnails.medium?.url || videoData.thumbnails.default?.url} 
+                  alt={videoData.title} 
+                  className="w-full h-auto rounded-lg"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/50 rounded-full p-2">
+                    <PlayCircle className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                  {formatDuration(videoData.duration)}
+                </div>
+              </>
             )}
           </div>
           
@@ -215,50 +176,79 @@ In a production environment, this would be the actual video content.
             <p className="text-sm text-muted-foreground">
               {videoData.snippet?.channelTitle || 'Unknown Channel'}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Duration: {formatDuration(videoData.duration)}
-            </p>
+            <div className="flex gap-2 flex-wrap mt-3">
+              <button
+                onClick={() => {
+                  setSelectedFormat('mp4');
+                  setAudioOnly(false);
+                  handleDownload();
+                }}
+                className="button button-primary flex items-center gap-2 text-sm"
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileVideo className="w-4 h-4" />
+                )}
+                {downloading ? 'Downloading...' : 'Download Video (MP4)'}
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedFormat('mp3');
+                  setAudioOnly(true);
+                  handleDownload();
+                }}
+                className="button button-secondary flex items-center gap-2 text-sm"
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <Loader className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Music className="w-4 h-4" />
+                )}
+                {downloading ? 'Downloading...' : 'Download Audio (MP3)'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Video Player (shown when video is ready) */}
-      {videoReady && downloadUrl && (
+      {/* Video Player (shown when preview is requested) */}
+      {showPreview && downloadUrl && (
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <div className="relative">
-            {selectedFormat === 'mp4' && !audioOnly ? (
-              <iframe
-                src={downloadUrl}
-                className="w-full aspect-video"
-                allowFullScreen
-                title="YouTube video player"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-              ></iframe>
-            ) : (
-              <div className="bg-black aspect-video flex items-center justify-center">
-                <div className="text-center">
-                  <Music className="w-16 h-16 mx-auto text-primary mb-4" />
-                  <p className="text-white text-lg">Audio Preview</p>
-                  <iframe
-                    src={`${downloadUrl}&autoplay=1`}
-                    className="hidden"
-                    title="YouTube audio player"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-                  ></iframe>
-                </div>
-              </div>
-            )}
+            <iframe
+              src={downloadUrl}
+              className="w-full aspect-video"
+              allowFullScreen
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            ></iframe>
           </div>
         </div>
       )}
       
-      {/* Download Options */}
+      {/* Advanced Download Options */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-4">Download Options</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Advanced Download Options</h3>
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="button button-primary flex items-center gap-2"
+          >
+            {downloading ? (
+              <Loader className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {downloading ? 'Downloading...' : 'Download'}
+          </button>
+        </div>
         
-        <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
           {/* Format Selector */}
           <div>
             <label className="block text-sm font-medium mb-2">Format</label>
@@ -311,7 +301,7 @@ In a production environment, this would be the actual video content.
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Estimated size: {formatFileSize(selectedQuality, selectedFormat, audioOnly)}
+              Estimated size: {getEstimatedSize(selectedQuality, selectedFormat, audioOnly)}
             </p>
           </div>
           
@@ -328,34 +318,6 @@ In a production environment, this would be the actual video content.
               <label htmlFor="audioOnly" className="text-sm">
                 Download Audio Only
               </label>
-            </div>
-          )}
-          
-          {/* Download Button */}
-          <button
-            onClick={handleDownload}
-            disabled={loading || downloading}
-            className="button button-primary w-full flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            ) : downloading ? (
-              <>
-                <Loader className="w-4 h-4 animate-spin" />
-                <span>Downloading...</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" />
-                {videoReady ? 'Download Now' : `Prepare ${selectedFormat.toUpperCase()} Download`}
-              </>
-            )}
-          </button>
-          
-          {videoReady && (
-            <div className="flex items-center gap-2 text-green-500 bg-green-500/10 p-3 rounded-lg">
-              <Check className="w-4 h-4" />
-              <p className="text-sm">Video ready! You can play it above or download it now.</p>
             </div>
           )}
         </div>
