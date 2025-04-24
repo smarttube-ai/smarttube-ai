@@ -469,7 +469,6 @@ const UsersAdmin: React.FC = () => {
 
   useEffect(() => {
     // Initial setup and fetch
-    console.log('Running useEffect for initialization');
     
     // Initial fetch
     fetchUsers(currentPage, searchQuery);
@@ -482,7 +481,6 @@ const UsersAdmin: React.FC = () => {
         schema: 'public', 
         table: 'profiles' 
       }, (payload) => {
-        console.log('Profile change received:', payload);
         // Refresh data when changes occur
         fetchUsers(currentPage, searchQuery);
       })
@@ -490,7 +488,6 @@ const UsersAdmin: React.FC = () => {
 
     // Set up interval for periodic refresh (every 30 seconds)
     const refreshInterval = setInterval(() => {
-      console.log('Auto-refreshing user data');
       fetchUsers(currentPage, searchQuery);
     }, 30000);
 
