@@ -6,13 +6,11 @@ import {
   User, 
   ArrowRight,
   ArrowLeft,
-  ToggleLeft as Google,
   BarChart2,
   Lightbulb,
   Search,
   AlertCircle,
-  CheckCircle,
-  KeyRound
+  CheckCircle
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { supabase } from '../../lib/supabase';
@@ -482,15 +480,8 @@ export default function AuthModal({ isOpen, onClose, disableClose }: Props) {
   return (
     <Dialog.Root open={isOpen} onOpenChange={disableClose ? undefined : onClose}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="h-full w-full"
-          />
-        </Dialog.Overlay>
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[900px] grid grid-cols-1 md:grid-cols-2 bg-[#01040B]/80 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/10">
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-overlayShow" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 max-h-[85vh] w-[90vw] max-w-[450px] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-[25px] shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] focus:outline-none data-[state=open]:animate-contentShow dark:bg-gray-800">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}

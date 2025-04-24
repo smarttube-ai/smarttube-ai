@@ -8,6 +8,7 @@ interface AuthContextType {
   initialized: boolean;
   signOut: () => Promise<void>;
   isLoading: boolean;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   initialized: false,
   signOut: async () => {},
   isLoading: false,
+  isAdmin: () => false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -63,16 +65,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      // First try to get profile from database
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, avatar_url, created_at, updated_at, role')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      // Get user email
+      const { data: userData } = await supabase.auth.getUser();
+      const userEmail = userData?.user?.email;
+      
+      // Set profile
+      if (error) {
+        console.error('Error fetching profile:', error);
+        // If no profile, but this is our admin email, create a temporary profile
+        if (userEmail === 'mbasam313@gmail.com') {
+          console.log('Creating temporary admin profile for mbasam313@gmail.com');
+          const tempProfile = {
+            id: userId,
+            email: userEmail,
+            role: 'admin',
+            full_name: null,
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setProfile(tempProfile);
+          
+          // Also insert this profile into the database
+          try {
+            await supabase.from('profiles').upsert({
+              id: userId,
+              email: userEmail,
+              role: 'admin',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            console.log('Inserted admin profile for mbasam313@gmail.com into database');
+          } catch (insertError) {
+            console.error('Error inserting profile:', insertError);
+          }
+        } else {
+          setProfile(null);
+        }
+      } else {
+        // We have a profile - make sure admin email always has admin role
+        if (userEmail === 'mbasam313@gmail.com' && data.role !== 'admin') {
+          console.log('Ensuring admin role for mbasam313@gmail.com');
+          const updatedProfile = { ...data, role: 'admin' };
+          setProfile(updatedProfile);
+          
+          // Update the role in the database
+          try {
+            await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
+            console.log('Updated admin role for mbasam313@gmail.com in database');
+          } catch (updateError) {
+            console.error('Error updating role:', updateError);
+          }
+        } else {
       setProfile(data);
+        }
+      }
+      
+      // Log the profile for debugging
+      console.log('User profile loaded:', profile);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error in profile handling:', error);
       setProfile(null);
     }
   };
@@ -101,8 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isAdmin = () => {
+    return profile?.role === 'admin';
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, initialized, signOut, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, initialized, signOut, isLoading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

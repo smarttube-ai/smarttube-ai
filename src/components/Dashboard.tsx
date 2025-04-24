@@ -17,11 +17,12 @@ import {
   FileEdit,
   ChevronLast,
   ChevronFirst,
+  ShieldCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { scrollToHero } from '../utils/scroll';
 import YouTubeTools from './YouTubeTools';
 import ScriptingSection from './ScriptingSection';
@@ -41,7 +42,7 @@ interface Activity {
 }
 
 export default function Dashboard() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -301,7 +302,7 @@ export default function Dashboard() {
           </button>
 
           {/* Menu Items */}
-          <div className="mt-2 px-3 space-y-1">
+          <div className="mt-2 px-2 space-y-0.5">
             {menuItems.map((item) => (
               <motion.a
                 key={item.id}
@@ -313,9 +314,13 @@ export default function Dashboard() {
                     setSidebarOpen(false);
                   }
                 }}
-                className={`sidebar-menu group ${activeSection === item.id ? 'active' : ''}`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                className={`flex items-center w-full gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                  activeSection === item.id
+                    ? "bg-white/10 text-white font-medium"
+                    : "text-gray-400 hover:bg-white/5 hover:text-white"
+                }`}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
                 aria-current={activeSection === item.id ? 'page' : undefined}
               >
                 <item.icon className="w-5 h-5" />
@@ -343,7 +348,7 @@ export default function Dashboard() {
         {/* Top Navigation */}
         <header className="h-16 border-b border-border bg-card sticky top-0 z-20">
           <div className="flex items-center h-full px-4 md:px-6">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2">
               {/* Gradient Circle with Icon */}
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#2762EB] to-[#9333EA] flex items-center justify-center">
                 {(() => {
@@ -368,6 +373,17 @@ export default function Dashboard() {
               className="ml-auto flex items-center space-x-4"
               layout
             >
+              {/* Admin Panel Button - Only visible for admins */}
+              {isAdmin() && (
+                <Link
+                  to="/admin/dashboard"
+                  className="flex items-center space-x-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-[#2762EB] to-[#9333EA] text-white hover:shadow-lg hover:from-[#1f52d6] hover:to-[#8022dd] transition-all shadow-md"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="font-medium">Admin Panel</span>
+                </Link>
+              )}
+
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <button 
@@ -391,9 +407,27 @@ export default function Dashboard() {
                     <div className="px-2 py-1.5 mb-2">
                       <div className="font-medium">{profile?.full_name || 'User'}</div>
                       <div className="text-sm text-muted-foreground">{user?.email}</div>
+                      {isAdmin() && (
+                        <div className="mt-1 text-xs bg-gradient-to-r from-[#2762EB] to-[#9333EA] text-white px-1.5 py-0.5 rounded inline-flex items-center">
+                          <ShieldCheck className="w-3 h-3 mr-1" />
+                          Admin
+                        </div>
+                      )}
                     </div>
 
                     <DropdownMenu.Separator className="h-px bg-border my-2" />
+
+                    {isAdmin() && (
+                      <DropdownMenu.Item
+                        className="flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-accent cursor-default"
+                        asChild
+                      >
+                        <Link to="/admin/dashboard">
+                          <ShieldCheck className="w-4 h-4 mr-2 text-[#2762EB]" />
+                          Admin Dashboard
+                        </Link>
+                      </DropdownMenu.Item>
+                    )}
 
                     <DropdownMenu.Item
                       className="flex items-center px-2 py-1.5 text-sm rounded-md hover:bg-accent cursor-default text-red-500"

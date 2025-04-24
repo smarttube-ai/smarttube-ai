@@ -5,6 +5,7 @@ import BackToTop from './components/BackToTop';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
+// Main app components
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const LandingPage = React.lazy(() => import('./components/landing/LandingPage'));
 const Login = React.lazy(() => import('./pages/Login'));
@@ -16,6 +17,17 @@ const NotFound = React.lazy(() => import('./pages/NotFound'));
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const AuthCallback = React.lazy(() => import('./pages/AuthCallback'));
+
+// Admin components
+const AdminGuard = React.lazy(() => import('./components/admin/AdminGuard'));
+const AdminLayout = React.lazy(() => import('./components/admin/AdminLayout'));
+const AdminDashboard = React.lazy(() => import('./pages/admin/Dashboard'));
+const UsersAdmin = React.lazy(() => import('./pages/admin/Users'));
+const PlansAdmin = React.lazy(() => import('./pages/admin/Plans'));
+const LimitsAdmin = React.lazy(() => import('./pages/admin/Limits'));
+const PaymentsAdmin = React.lazy(() => import('./pages/admin/Payments'));
+const SettingsAdmin = React.lazy(() => import('./pages/admin/Settings'));
+const AnnouncementsAdmin = React.lazy(() => import('./pages/admin/Announcements'));
 
 function App() {
   const { user } = useAuth();
@@ -55,6 +67,22 @@ function App() {
             
             {/* Auth callback route */}
             <Route path="/auth/callback" element={<AuthCallback />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={
+              <AdminGuard>
+                <AdminLayout />
+              </AdminGuard>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="users" element={<UsersAdmin />} />
+              <Route path="plans" element={<PlansAdmin />} />
+              <Route path="limits" element={<LimitsAdmin />} />
+              <Route path="payments" element={<PaymentsAdmin />} />
+              <Route path="settings" element={<SettingsAdmin />} />
+              <Route path="announcements" element={<AnnouncementsAdmin />} />
+            </Route>
             
             {/* 404 page - this must be the last route to catch all unmatched paths */}
             <Route path="*" element={<NotFound />} />

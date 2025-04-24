@@ -253,17 +253,17 @@ Also, below each idea, add a simple call-to-action text:
             <div className="space-y-6 idea-content">
               {ideaResponse.split('🎯').filter(idea => idea.trim()).map((idea, index) => (
                 <div key={index} className="idea-card card p-6 bg-gray-800/50 rounded-lg hover:bg-gray-800/70 transition-colors">
-                  <div 
-                    className="prose max-w-none" 
-                    dangerouslySetInnerHTML={{ 
+              <div 
+                className="prose max-w-none" 
+                dangerouslySetInnerHTML={{ 
                       __html: idea
-                        .replace(/\n/g, '<br>')
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                         .replace(/Title: (.*?)\n/g, '<h4 class="text-lg font-semibold mb-1">$1</h4>')
-                        .replace(/Summary: (.*?)(?=\n→|$)/gs, '<p class="mb-3">$1</p>')
+                    .replace(/Summary: (.*?)(?=\n→|$)/gs, '<p class="mb-3">$1</p>')
                         .replace(/→ Button: "Write Script for This Video"/g, '')
-                    }}
-                  />
+                }}
+              />
                 </div>
               ))}
             </div>

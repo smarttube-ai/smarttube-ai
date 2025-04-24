@@ -7,7 +7,8 @@ import {
   Check, 
   ChevronDown,
   Loader,
-  PlayCircle
+  PlayCircle,
+  ExternalLink
 } from 'lucide-react';
 import { VideoData } from '../../types/youtube';
 
@@ -18,6 +19,10 @@ interface VideoDownloadProps {
 
 type VideoQuality = '144p' | '240p' | '360p' | '480p' | '720p' | '1080p';
 type VideoFormat = 'mp4' | 'mp3';
+
+// URL of our hypothetical backend server that handles YouTube downloads
+// In production this would be your actual backend service URL
+const API_BASE_URL = 'http://localhost:3001/api/youtube-download';
 
 export default function VideoDownload({ videoData, videoId }: VideoDownloadProps) {
   const [loading, setLoading] = useState(false);
@@ -87,49 +92,44 @@ export default function VideoDownload({ videoData, videoId }: VideoDownloadProps
     }
   };
 
+  // Generate URL for downloading based on the current settings
+  const getDownloadUrl = useCallback(() => {
+    if (!videoId) return null;
+    
+    // In a real implementation, this would be your actual server endpoint
+    // that processes the YouTube download
+    const quality = selectedFormat === 'mp3' ? 'highestaudio' : selectedQuality === '1080p' ? 'highest' : selectedQuality;
+    
+    // Format the filename
+    const filename = videoData?.title ? 
+      videoData.title.replace(/[/\\?%*:|"<>]/g, '-') : 
+      `YouTube-${videoId}`;
+    
+    // Build the download URL with query parameters
+    return `${API_BASE_URL}?videoId=${videoId}&format=${selectedFormat}&quality=${quality}&audioOnly=${audioOnly}&filename=${encodeURIComponent(filename)}`;
+  }, [videoId, selectedFormat, selectedQuality, audioOnly, videoData]);
+
   const handleDownload = async () => {
     try {
       setDownloading(true);
       setError(null);
       
-      // Create a small placeholder file instead of a large dummy file
-      const placeholderContent = `SmartTube AI - Downloaded Video
+      const downloadUrl = getDownloadUrl();
       
-Video ID: ${videoId}
-Title: ${videoData?.title || 'YouTube Video'}
-Format: ${selectedFormat.toUpperCase()}
-Quality: ${selectedQuality}
-Audio Only: ${audioOnly ? 'Yes' : 'No'}
-Download Date: ${new Date().toLocaleString()}
+      if (!downloadUrl) {
+        throw new Error('Cannot generate download URL');
+      }
 
-This is a simulated download from SmartTube AI.
-`;
+      // Redirect to the server for actual download
+      window.location.href = downloadUrl;
       
-      // Create a blob with a small content
-      const blob = new Blob([placeholderContent], { 
-        type: selectedFormat === 'mp4' ? 'video/mp4' : 'audio/mpeg' 
-      });
+      // Set downloading to false after a short delay
+      setTimeout(() => {
+        setDownloading(false);
+      }, 1500);
       
-      // Prepare filename
-      let filename = videoData?.title || 'YouTube Video';
-      // Replace invalid filename characters
-      filename = filename.replace(/[/\\?%*:|"<>]/g, '-');
-      
-      // Create a blob URL and trigger download
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `${filename}.${selectedFormat}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up the blob URL immediately
-      URL.revokeObjectURL(blobUrl);
-      
-      // Finish downloading
-      setDownloading(false);
     } catch (err) {
+      console.error('Download error:', err);
       setError('Download failed. Please try again.');
       setDownloading(false);
     }
@@ -154,11 +154,11 @@ This is a simulated download from SmartTube AI.
           <div className="w-full md:w-1/3 relative group cursor-pointer" onClick={handlePlayPreview}>
             {videoData.thumbnails && (
               <>
-                <img 
-                  src={videoData.thumbnails.medium?.url || videoData.thumbnails.default?.url} 
-                  alt={videoData.title} 
-                  className="w-full h-auto rounded-lg"
-                />
+              <img 
+                src={videoData.thumbnails.medium?.url || videoData.thumbnails.default?.url} 
+                alt={videoData.title} 
+                className="w-full h-auto rounded-lg"
+              />
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="bg-black/50 rounded-full p-2">
                     <PlayCircle className="w-12 h-12 text-white" />
@@ -176,6 +176,19 @@ This is a simulated download from SmartTube AI.
             <p className="text-sm text-muted-foreground">
               {videoData.snippet?.channelTitle || 'Unknown Channel'}
             </p>
+
+            <div className="flex gap-2 flex-wrap mt-3">
+              <a 
+                href={`https://www.youtube.com/watch?v=${videoId}`} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="flex items-center gap-1 text-sm text-blue-500 hover:underline"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Watch on YouTube
+              </a>
+            </div>
+            
             <div className="flex gap-2 flex-wrap mt-3">
               <button
                 onClick={() => {
@@ -218,14 +231,14 @@ This is a simulated download from SmartTube AI.
       {showPreview && downloadUrl && (
         <div className="bg-card border border-border rounded-lg overflow-hidden">
           <div className="relative">
-            <iframe
-              src={downloadUrl}
-              className="w-full aspect-video"
-              allowFullScreen
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-            ></iframe>
+              <iframe
+                src={downloadUrl}
+                className="w-full aspect-video"
+                allowFullScreen
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+              ></iframe>
           </div>
         </div>
       )}
