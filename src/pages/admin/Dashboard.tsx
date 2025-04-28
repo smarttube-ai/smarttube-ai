@@ -96,143 +96,66 @@ const AdminDashboard: React.FC = () => {
         // Fetch all the stats in parallel for better performance
         const [
           usersResult,
-          subsResult,
-          plansResult,
-          paymentsResult,
-          paymentsThisMonthResult,
-          paymentsLastMonthResult,
-          usersThisMonthResult,
-          usersLastMonthResult,
           recentUsersResult,
-          recentPaymentsResult
+          plansResult
         ] = await Promise.all([
-          // Total users
+          // Total users count
           supabase.from('profiles').select('*', { count: 'exact', head: true }),
           
-          // Active subscriptions
-          supabase.from('user_plans').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-          
-          // Plans data
-          supabase.from('plans').select('*'),
-          
-          // Payments data
-          supabase.from('payments').select('*', { count: 'exact', head: true }),
-          
-          // Payments this month
-          supabase.from('payments')
-            .select('amount, currency, status')
-            .gte('created_at', thirtyDaysAgoStr),
-            
-          // Payments last month
-          supabase.from('payments')
-            .select('amount, currency, status')
-            .gte('created_at', sixtyDaysAgoStr)
-            .lt('created_at', thirtyDaysAgoStr),
-            
-          // Users this month
-          supabase.from('profiles')
-            .select('id')
-            .gte('created_at', thirtyDaysAgoStr),
-            
-          // Users last month
-          supabase.from('profiles')
-            .select('id')
-            .gte('created_at', sixtyDaysAgoStr)
-            .lt('created_at', thirtyDaysAgoStr),
-            
-          // Recent users
+          // Recent users - fetch the 8 most recent users
           supabase.from('profiles')
             .select('id, full_name, email, avatar_url, created_at, is_admin, is_banned')
             .order('created_at', { ascending: false })
             .limit(8),
             
-          // Recent payments
-          supabase.from('payments')
-            .select(`
-              id, 
-              amount, 
-              currency, 
-              status, 
-              created_at,
-              profiles(email, full_name),
-              plans(name)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(5)
+          // Plans data
+          supabase.from('plans').select('*'),
+          
         ]);
         
-        // Handle errors
-        if (usersResult.error) throw usersResult.error;
-        if (subsResult.error) throw subsResult.error;
-        if (plansResult.error) throw plansResult.error;
-        if (paymentsResult.error) throw paymentsResult.error;
-        if (paymentsThisMonthResult.error) throw paymentsThisMonthResult.error;
-        if (paymentsLastMonthResult.error) throw paymentsLastMonthResult.error;
-        if (usersThisMonthResult.error) throw usersThisMonthResult.error;
-        if (usersLastMonthResult.error) throw usersLastMonthResult.error;
-        if (recentUsersResult.error) throw recentUsersResult.error;
-        if (recentPaymentsResult.error) throw recentPaymentsResult.error;
+        // Handle errors or missing tables gracefully
+        if (usersResult.error) console.error('Error fetching users count:', usersResult.error);
+        if (recentUsersResult.error) console.error('Error fetching recent users:', recentUsersResult.error);
+        if (plansResult.error) console.error('Error fetching plans:', plansResult.error);
         
-        // Calculate revenue
-        const currentMonthRevenue = paymentsThisMonthResult.data
-          .filter(payment => payment.status === 'paid')
-          .reduce((sum, payment) => sum + payment.amount, 0);
+        // Fetch users from this month and last month for growth calculation
+        const usersThisMonthResult = await supabase.from('profiles')
+          .select('id')
+          .gte('created_at', thirtyDaysAgoStr);
           
-        const lastMonthRevenue = paymentsLastMonthResult.data
-          .filter(payment => payment.status === 'paid')
-          .reduce((sum, payment) => sum + payment.amount, 0);
-          
+        const usersLastMonthResult = await supabase.from('profiles')
+          .select('id')
+          .gte('created_at', sixtyDaysAgoStr)
+          .lt('created_at', thirtyDaysAgoStr);
+        
         // Calculate growth rates
         const userGrowth = calculateGrowthRate(
-          usersLastMonthResult.data.length,
-          usersThisMonthResult.data.length
+          usersLastMonthResult.data?.length || 0,
+          usersThisMonthResult.data?.length || 0
         );
         
-        const revenueGrowth = calculateGrowthRate(
-          lastMonthRevenue,
-          currentMonthRevenue
-        );
-        
-        // Calculate successful payments ratio
-        const successfulPayments = paymentsResult.data?.filter(p => p.status === 'paid').length || 0;
-        
-        // Set active plans count
+        // Placeholder data for subscriptions and payments until those are implemented
         const activePlans = plansResult.data?.filter(p => p.is_active).length || 0;
         
-        // Transform payment data for display
-        const transformedPayments = recentPaymentsResult.data?.map(payment => {
-          // Extract the first item from the arrays
-          const profileData = Array.isArray(payment.profiles) ? payment.profiles[0] : payment.profiles;
-          const planData = Array.isArray(payment.plans) ? payment.plans[0] : payment.plans;
-          
-          return {
-            id: payment.id,
-            amount: payment.amount,
-            currency: payment.currency || 'USD',
-            status: payment.status,
-            user_email: profileData?.email || 'Unknown',
-            user_name: profileData?.full_name || null,
-            plan_name: planData?.name || 'Unknown Plan',
-            created_at: payment.created_at
-          };
-        }) || [];
-        
-        // Set final stats
+        // Set final stats with available data, use placeholders for missing data
         setStats({
           totalUsers: usersResult.count || 0,
-          activeSubscriptions: subsResult.count || 0,
-          monthlyRevenue: currentMonthRevenue,
-          avgDailyActiveUsers: Math.round((usersResult.count || 0) * 0.3), // Estimate until we implement activity tracking
+          activeSubscriptions: 0, // Placeholder
+          monthlyRevenue: 0, // Placeholder
+          avgDailyActiveUsers: Math.round((usersResult.count || 0) * 0.3), // Estimate
           totalPlans: plansResult.data?.length || 0,
           activePlans: activePlans,
-          totalPayments: paymentsResult.count || 0,
-          successfulPayments: successfulPayments,
+          totalPayments: 0, // Placeholder
+          successfulPayments: 0, // Placeholder
           userGrowth: userGrowth,
-          revenueGrowth: revenueGrowth
+          revenueGrowth: 0 // Placeholder
         });
         
+        // Set recent users
         setRecentUsers(recentUsersResult.data || []);
-        setRecentPayments(transformedPayments);
+        
+        // Placeholder for recent payments
+        setRecentPayments([]);
         
       } catch (error) {
         console.error('Error fetching admin stats:', error);

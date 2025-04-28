@@ -18,6 +18,7 @@ interface Plan {
   features: Record<string, number>;
   is_active: boolean;
   user_count?: number;
+  description?: string;
 }
 
 interface PlanFormData {
@@ -25,6 +26,7 @@ interface PlanFormData {
   price: number;
   features: string;
   is_active: boolean;
+  description: string;
 }
 
 interface ToastState {
@@ -43,7 +45,8 @@ const PlansAdmin: React.FC = () => {
     name: '',
     price: 0,
     features: '{}',
-    is_active: true
+    is_active: true,
+    description: ''
   });
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof PlanFormData, string>>>({});
   const [toast, setToast] = useState<ToastState>({ open: false, message: '', type: 'success' });
@@ -51,6 +54,146 @@ const PlansAdmin: React.FC = () => {
   useEffect(() => {
     fetchPlans();
   }, []);
+
+  // Add the three default plans if none exist
+  const addDefaultPlans = async () => {
+    try {
+      // Define the new plan structures
+      const plans = [
+        {
+          name: 'Free',
+          price: 0,
+          features: {
+            "Scripting Tool": 7,
+            "Ideation Tool": 4,
+            "YouTube Tools": 12,
+            "Title Generator": 12,
+            "Description Generator": 12,
+            "Hashtag Generator": 15,
+            "Keyword Ideas": 15,
+            "Video Hook Generator": 10,
+            "Title A/B Tester": 10,
+            "Description Optimizer": 10,
+            "Support": 0
+          },
+          is_active: true,
+          description: 'Get Started with Basic Tools for Content Creation.'
+        },
+        {
+          name: 'Basic',
+          price: 9.99,
+          features: {
+            "Scripting Tool": 20,
+            "Ideation Tool": 18,
+            "YouTube Tools": 30,
+            "Title Generator": 40,
+            "Description Generator": 40,
+            "Hashtag Generator": 50,
+            "Keyword Ideas": 50,
+            "Video Hook Generator": 40,
+            "Title A/B Tester": 40,
+            "Description Optimizer": 40,
+            "Support": 1
+          },
+          is_active: true,
+          description: 'Ideal for Serious Creators Looking for More Tools.'
+        },
+        {
+          name: 'Pro',
+          price: 29.99,
+          features: {
+            "Scripting Tool": -1,
+            "Ideation Tool": -1,
+            "YouTube Tools": -1,
+            "Title Generator": -1,
+            "Description Generator": -1,
+            "Hashtag Generator": -1,
+            "Keyword Ideas": -1,
+            "Video Hook Generator": -1,
+            "Title A/B Tester": -1,
+            "Description Optimizer": -1,
+            "Support": 2
+          },
+          is_active: true,
+          description: 'Best for Professional Creators Needing Unlimited Access.'
+        }
+      ];
+
+      // First try to update any existing plans by name - overwrite them
+      const { data: existingPlans, error: fetchError } = await supabase
+        .from('plans')
+        .select('id, name');
+      
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      // Map existing plan names to their IDs
+      const planMap: Record<string, string> = existingPlans.reduce((acc: Record<string, string>, plan) => {
+        acc[plan.name] = plan.id;
+        return acc;
+      }, {});
+
+      // Update existing plans first
+      for (const plan of plans) {
+        // If a plan with this name exists, update it
+        if (planMap[plan.name]) {
+          const { error } = await supabase
+            .from('plans')
+            .update({
+              price: plan.price,
+              features: plan.features,
+              is_active: plan.is_active,
+              description: plan.description
+            })
+            .eq('id', planMap[plan.name]);
+          
+          if (error) throw error;
+          
+          // Remove from our plans list so we don't create duplicates
+          delete planMap[plan.name];
+        } else {
+          // Insert new plan
+          const { error } = await supabase
+            .from('plans')
+            .insert([plan]);
+          
+          if (error) throw error;
+        }
+      }
+
+      // Handle plans that weren't in our update list (rename them to avoid confusion)
+      for (const [name, id] of Object.entries(planMap)) {
+        const { error } = await supabase
+          .from('plans')
+          .update({ 
+            name: `${name} (Legacy)`,
+            is_active: false
+          })
+          .eq('id', id);
+        
+        if (error) throw error;
+      }
+
+      showToast('Plans updated successfully', 'success');
+      fetchPlans();
+    } catch (error) {
+      console.error('Error updating plans:', error);
+      showToast('Failed to update plans', 'error');
+    }
+  };
+
+  // Add a button to force update plans
+  const forceUpdatePlans = () => {
+    addDefaultPlans();
+  };
+
+  // Check if plans need to be initialized
+  useEffect(() => {
+    if (!loading && plans.length === 0) {
+      addDefaultPlans();
+    }
+  }, [loading, plans.length]);
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -126,7 +269,8 @@ const PlansAdmin: React.FC = () => {
       name: '',
       price: 0,
       features: '{}',
-      is_active: true
+      is_active: true,
+      description: ''
     });
     setFormErrors({});
   };
@@ -143,7 +287,8 @@ const PlansAdmin: React.FC = () => {
       name: plan.name,
       price: plan.price,
       features: JSON.stringify(plan.features, null, 2),
-      is_active: plan.is_active
+      is_active: plan.is_active,
+      description: plan.description || ''
     });
     setModalOpen(true);
   };
@@ -169,7 +314,8 @@ const PlansAdmin: React.FC = () => {
             name: formData.name,
             price: formData.price,
             features: parsedFeatures,
-            is_active: formData.is_active
+            is_active: formData.is_active,
+            description: formData.description
           })
           .eq('id', currentPlan.id);
         
@@ -183,7 +329,8 @@ const PlansAdmin: React.FC = () => {
             name: formData.name,
             price: formData.price,
             features: parsedFeatures,
-            is_active: formData.is_active
+            is_active: formData.is_active,
+            description: formData.description
           });
         
         if (error) throw error;
@@ -250,8 +397,21 @@ const PlansAdmin: React.FC = () => {
   // Format features as a readable list
   const formatFeatures = (features: Record<string, number>) => {
     return Object.entries(features).map(([key, value]) => (
-      <div key={key} className="text-sm">
-        <span className="capitalize">{key}</span>: <span className="font-medium">{value}</span>
+      <div key={key} className="flex justify-between items-center py-1.5 border-b border-[#1e293b] last:border-0">
+        <span className="capitalize text-gray-300">{key}</span>
+        <span className={`font-medium px-3 py-0.5 rounded-full text-sm ${
+          value === -1 
+            ? "bg-green-500/20 text-green-400" 
+            : value === 0
+              ? "bg-red-500/20 text-red-400"
+              : "bg-blue-500/20 text-blue-400"
+        }`}>
+          {value === -1 
+            ? "Unlimited" 
+            : value === 0
+              ? "None"
+              : value}
+        </span>
       </div>
     ));
   };
@@ -260,13 +420,21 @@ const PlansAdmin: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Plans Management</h1>
-        <button
-          onClick={openAddModal}
-          className="bg-white text-[#020817] px-4 py-2 rounded-md flex items-center hover:bg-white/90 transition-colors"
-        >
-          <Plus size={16} className="mr-2" />
-          Add New Plan
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={forceUpdatePlans}
+            className="bg-[#2762EB] text-white px-4 py-2 rounded-md flex items-center hover:bg-[#2762EB]/90 transition-colors"
+          >
+            Force Update Plans
+          </button>
+          <button
+            onClick={openAddModal}
+            className="bg-white text-[#020817] px-4 py-2 rounded-md flex items-center hover:bg-white/90 transition-colors"
+          >
+            <Plus size={16} className="mr-2" />
+            Add New Plan
+          </button>
+        </div>
       </div>
       
       <div className="card p-6">
@@ -279,21 +447,24 @@ const PlansAdmin: React.FC = () => {
             {plans.map((plan) => (
               <div 
                 key={plan.id} 
-                className={`card ${plan.is_active ? '' : 'opacity-70'} flex flex-col`}
+                className={`card ${plan.is_active ? '' : 'opacity-70'} flex flex-col p-5`}
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-5">
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-1">{plan.name}</h3>
+                    <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
+                    {plan.description && (
+                      <p className="text-sm text-gray-400 mb-3">{plan.description}</p>
+                    )}
                     <div className="flex items-center text-[#2762EB] font-bold">
-                      <DollarSign size={16} className="mr-1" />
+                      <DollarSign size={20} className="mr-2" />
                       {plan.price === 0 ? (
-                        <span>Free</span>
+                        <span className="text-xl">Free</span>
                       ) : (
-                        <span>${plan.price.toFixed(2)}/month</span>
+                        <span className="text-xl">${plan.price.toFixed(2)}/month</span>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center space-x-1">
                     <button 
                       onClick={() => togglePlanStatus(plan)}
                       className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -309,20 +480,20 @@ const PlansAdmin: React.FC = () => {
                       onClick={() => openEditModal(plan)}
                       className="p-2 text-gray-400 hover:text-white transition-colors"
                     >
-                      <Pencil size={16} />
+                      <Pencil size={18} />
                     </button>
                     <button
                       onClick={() => openDeleteModal(plan)}
                       className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 </div>
                 
-                <div className="mt-2 flex-1">
-                  <div className="text-sm text-gray-400 mb-2">Features:</div>
-                  <div className="space-y-1">
+                <div className="mt-3 flex-1">
+                  <div className="text-sm font-medium text-gray-300 mb-3">Features:</div>
+                  <div className="space-y-2 bg-[#121826] p-4 rounded-md">
                     {Object.keys(plan.features).length > 0 ? (
                       formatFeatures(plan.features)
                     ) : (
@@ -331,9 +502,9 @@ const PlansAdmin: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-[#2D3748]">
+                <div className="mt-5 pt-4 border-t border-[#2D3748]">
                   <div className="flex items-center text-sm text-gray-400">
-                    <Package size={14} className="mr-1" />
+                    <Package size={16} className="mr-2" />
                     <span>{plan.user_count} active users</span>
                   </div>
                 </div>
@@ -362,28 +533,48 @@ const PlansAdmin: React.FC = () => {
             
             <form onSubmit={handleSubmit} className="mt-4">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-400 mb-1">
                   Plan Name
                 </label>
                 <input
                   type="text"
+                  id="name"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
                   className="input w-full"
-                  placeholder="e.g. Basic, Pro, Enterprise"
+                  placeholder="e.g. Basic Plan, Pro Plan"
                 />
                 {formErrors.name && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
                 )}
               </div>
+
+              <div className="mb-4">
+                <label htmlFor="description" className="block text-sm font-medium text-gray-400 mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="input w-full"
+                  placeholder="e.g. Perfect for beginners"
+                />
+                {formErrors.description && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
+                )}
+              </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+                <label htmlFor="price" className="block text-sm font-medium text-gray-400 mb-1">
                   Monthly Price ($)
                 </label>
                 <input
                   type="number"
+                  id="price"
                   name="price"
                   value={formData.price}
                   onChange={handleInputChange}
@@ -402,7 +593,7 @@ const PlansAdmin: React.FC = () => {
                   Features (JSON format)
                 </label>
                 <div className="text-xs text-gray-500 mb-2">
-                  Enter as {"{"}"feature": limit{"}"}. Example: {"{"}"ideas": 10, "seo": 5{"}"}
+                  Enter as {"{"}"feature": limit{"}"}. Example: {"{"}"ideas": 10, "seo": 5{"}"}. Use -1 for unlimited.
                 </div>
                 <textarea
                   name="features"
@@ -410,7 +601,7 @@ const PlansAdmin: React.FC = () => {
                   onChange={handleInputChange}
                   rows={5}
                   className="input w-full"
-                  placeholder='{"ideas": 10, "seo": 5}'
+                  placeholder='{"Scripting Tool": 10, "Ideation Tool": -1}'
                 />
                 {formErrors.features && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.features}</p>

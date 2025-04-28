@@ -75,10 +75,21 @@ const UsersAdmin: React.FC = () => {
       console.log('Using client for fetching users:', adminSupabase ? 'admin (bypasses RLS)' : 'regular');
       
       try {
-        // Build query
+        // Build query to get profiles with plan data
         let userQuery = client
           .from('profiles')
-          .select('*', { count: 'exact' });
+          .select(`
+            *,
+            user_plans (
+              plan_id,
+              expiry,
+              custom_limits
+            ),
+            plans!user_plans (
+              name,
+              price
+            )
+          `, { count: 'exact' });
           
         // Apply search filter if query exists
         if (query) {
@@ -94,23 +105,66 @@ const UsersAdmin: React.FC = () => {
 
         if (error) {
           console.error('Supabase query error:', error);
-          setUsers([]);
-          setTotalUsers(0);
-          setTotalPages(1);
+          
+          // Fallback to just profiles if the join fails (might be no plans yet)
+          const { data: profilesOnly, error: profilesError, count: profilesCount } = await client
+            .from('profiles')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, to);
+            
+          if (profilesError) {
+            console.error('Profiles-only query error:', profilesError);
+            setUsers([]);
+            setTotalUsers(0);
+            setTotalPages(1);
+            return;
+          }
+          
+          if (!profilesOnly || profilesOnly.length === 0) {
+            console.log('No users found.');
+            setUsers([]);
+            setTotalUsers(0);
+            setTotalPages(1);
+            return;
+          }
+          
+          // Transform profiles-only data
+          const transformedProfiles = profilesOnly.map(user => ({
+            id: user.id || '',
+            email: user.email || '',
+            full_name: user.full_name || null,
+            avatar_url: user.avatar_url || null,
+            created_at: user.created_at || new Date().toISOString(),
+            updated_at: user.updated_at || undefined,
+            role: user.role || 'user',
+            is_admin: user.is_admin || false,
+            is_banned: user.is_banned || false,
+            plan_name: 'Free',
+            plan_status: 'active'
+          }));
+          
+          setUsers(transformedProfiles);
+          setTotalUsers(profilesCount || 0);
+          setTotalPages(Math.ceil((profilesCount || 0) / usersPerPage));
           return;
         }
 
         if (!data || data.length === 0) {
-          console.log('No users found. Try creating some test users.');
+          console.log('No users found.');
           setUsers([]);
           setTotalUsers(0);
           setTotalPages(1);
           return;
         }
 
-        // Transform data with simple structure
+        // Transform data with plan information
         const transformedData = data.map(user => {
-          // Handle the available fields safely - using existing columns
+          // Get plan info
+          const planName = user.plans ? user.plans.name : 'Free';
+          const planExpiry = user.user_plans ? new Date(user.user_plans.expiry) : null;
+          const isExpired = planExpiry ? planExpiry < new Date() : false;
+          
           return {
             id: user.id || '',
             email: user.email || '',
@@ -118,12 +172,11 @@ const UsersAdmin: React.FC = () => {
             avatar_url: user.avatar_url || null,
             created_at: user.created_at || new Date().toISOString(),
             updated_at: user.updated_at || undefined,
-            role: user.role || undefined,
-            // Use these properties if they exist, otherwise use role value or defaults
-            is_admin: user.hasOwnProperty('is_admin') ? !!user.is_admin : (user.role === 'admin'),
-            is_banned: user.hasOwnProperty('is_banned') ? !!user.is_banned : false,
-            plan_name: 'Free',
-            plan_status: 'none'
+            role: user.role || 'user',
+            is_admin: user.is_admin || false,
+            is_banned: user.is_banned || false,
+            plan_name: planName,
+            plan_status: isExpired ? 'expired' : 'active'
           };
         });
 
@@ -150,73 +203,21 @@ const UsersAdmin: React.FC = () => {
   // Ensure profiles table exists
   const ensureProfilesTable = async () => {
     try {
-      console.log('Checking if profiles table exists...');
-      
-      // Try a more robust approach to check if the table exists
-      const { data: tablesData, error: tablesError } = await supabase
-        .rpc('get_tables_info');
+      // Try a simple query to check if the profiles table is accessible
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('count(*)', { count: 'exact', head: true });
         
-      if (tablesError) {
-        console.error('Error getting tables info:', tablesError);
-        
-        // Fallback: Try a direct query to check existence
-        try {
-          console.log('Trying direct query approach...');
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('count(*)')
-            .limit(1);
-            
-          if (error) {
-            console.error('Error in direct query:', error);
-            console.log('It appears the profiles table may not exist');
-            
-            // Alert with RLS guidance as well
-            alert(
-              'The profiles table either does not exist or has Row Level Security (RLS) issues.\n\n' +
-              'Please check your Supabase setup and:\n' +
-              '1. Make sure the profiles table exists\n' +
-              '2. Add an INSERT policy with this SQL command:\n\n' +
-              'CREATE POLICY "Allow all inserts to profiles"\n' +
-              'ON profiles FOR INSERT\n' +
-              'WITH CHECK (true);'
-            );
-            return false;
-          }
-          
-          console.log('Table exists and is accessible');
-          return true;
-        } catch (innerError) {
-          console.error('Error in fallback check:', innerError);
-          return false;
-        }
-      }
-      
-      // Check if profiles table exists in the returned tables
-      const profilesTable = Array.isArray(tablesData) && 
-        tablesData.find(table => table.name === 'profiles');
-        
-      if (!profilesTable) {
-        console.log('Profiles table not found in table list');
+      if (error) {
+        console.error('Error checking profiles table:', error);
         alert(
-          'The profiles table does not exist in your Supabase project.\n\n' +
-          'Please create it using the SQL editor with this command:\n\n' +
-          'CREATE TABLE IF NOT EXISTS profiles (\n' +
-          '  id UUID PRIMARY KEY,\n' +
-          '  email TEXT NOT NULL,\n' +
-          '  full_name TEXT,\n' +
-          '  avatar_url TEXT,\n' +
-          '  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\n' +
-          '  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),\n' +
-          '  role TEXT,\n' +
-          '  is_admin BOOLEAN DEFAULT FALSE,\n' +
-          '  is_banned BOOLEAN DEFAULT FALSE\n' +
-          ');'
+          'The profiles table may not be accessible. Please check your Supabase setup.\n\n' +
+          'You can run the migration script to recreate the profiles table and its policies.'
         );
         return false;
       }
       
-      console.log('Profiles table exists');
+      console.log('Profiles table exists and is accessible');
       return true;
     } catch (error) {
       console.error('Error in ensureProfilesTable:', error);
@@ -880,6 +881,14 @@ const UsersAdmin: React.FC = () => {
               <div className="text-sm text-gray-400">
                 Showing <span className="font-medium text-white">{users.length}</span> of{' '}
                 <span className="font-medium text-white">{totalUsers}</span> users
+              </div>
+              <div className="flex items-center justify-center w-full">
+                <button
+                  onClick={syncAuthUsers}
+                  className="px-6 py-2 bg-[#2762EB] text-white rounded-md hover:bg-[#2762EB]/80 transition-colors mx-auto"
+                >
+                  Sync Users
+                </button>
               </div>
               <div className="flex items-center space-x-2">
                 <button
