@@ -427,13 +427,13 @@ const PlansAdmin: React.FC = () => {
           >
             Force Update Plans
           </button>
-          <button
-            onClick={openAddModal}
-            className="bg-white text-[#020817] px-4 py-2 rounded-md flex items-center hover:bg-white/90 transition-colors"
-          >
-            <Plus size={16} className="mr-2" />
-            Add New Plan
-          </button>
+        <button
+          onClick={openAddModal}
+          className="bg-white text-[#020817] px-4 py-2 rounded-md flex items-center hover:bg-white/90 transition-colors"
+        >
+          <Plus size={16} className="mr-2" />
+          Add New Plan
+        </button>
         </div>
       </div>
       
@@ -549,7 +549,7 @@ const PlansAdmin: React.FC = () => {
                   <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
                 )}
               </div>
-
+              
               <div className="mb-4">
                 <label htmlFor="description" className="block text-sm font-medium text-gray-400 mb-1">
                   Description
