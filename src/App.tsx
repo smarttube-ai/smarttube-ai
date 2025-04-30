@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext';
 import BackToTop from './components/BackToTop';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 // Main app components
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -35,6 +36,9 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen flex flex-col">
+        {/* Show announcement banner only for authenticated users */}
+        {user && <AnnouncementBanner />}
+        
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
