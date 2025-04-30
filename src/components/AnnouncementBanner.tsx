@@ -8,6 +8,7 @@ interface Announcement {
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high';
+  announcement_type: 'bar' | 'dialog';
   expiry_date: string;
   created_at: string;
 }
@@ -20,13 +21,13 @@ const AnnouncementBanner: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        // Use the custom function we created in the migration
-        const { data, error } = await supabase.rpc('get_active_announcements');
+        // Use the custom function we created in the migration that specifically gets bar announcements
+        const { data, error } = await supabase.rpc('get_bar_announcements');
         
         if (error) throw error;
         
         // Check local storage for previously dismissed announcements
-        const storedDismissed = localStorage.getItem('dismissed_announcements');
+        const storedDismissed = localStorage.getItem('dismissed_bar_announcements');
         const dismissedAnnouncements = storedDismissed ? JSON.parse(storedDismissed) : {};
         
         // Filter out any announcements that the user has dismissed
@@ -37,7 +38,7 @@ const AnnouncementBanner: React.FC = () => {
         setAnnouncements(filteredAnnouncements);
         setDismissed(dismissedAnnouncements);
       } catch (error) {
-        console.error('Error fetching announcements:', error);
+        console.error('Error fetching bar announcements:', error);
       }
     };
 
@@ -57,7 +58,7 @@ const AnnouncementBanner: React.FC = () => {
   const dismissAnnouncement = (id: string) => {
     const updatedDismissed = { ...dismissed, [id]: true };
     setDismissed(updatedDismissed);
-    localStorage.setItem('dismissed_announcements', JSON.stringify(updatedDismissed));
+    localStorage.setItem('dismissed_bar_announcements', JSON.stringify(updatedDismissed));
     
     // Remove from the current announcements array
     setAnnouncements(prev => prev.filter(a => a.id !== id));
@@ -78,12 +79,12 @@ const AnnouncementBanner: React.FC = () => {
   const getPriorityStyles = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-900/80 border-red-500/50 text-white';
+        return 'bg-gradient-to-r from-red-900/90 to-red-800/90 border-red-500/50';
       case 'medium':
-        return 'bg-amber-900/70 border-amber-500/50 text-white';
+        return 'bg-gradient-to-r from-amber-900/80 to-amber-800/80 border-amber-500/50';
       case 'low':
       default:
-        return 'bg-blue-900/70 border-blue-500/50 text-white';
+        return 'bg-gradient-to-r from-blue-900/80 to-blue-800/80 border-blue-500/50';
     }
   };
 
@@ -98,16 +99,18 @@ const AnnouncementBanner: React.FC = () => {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -100, opacity: 0 }}
-        className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 border-b ${getPriorityStyles(currentAnnouncement.priority)}`}
+        transition={{ duration: 0.3 }}
+        className={`fixed top-0 left-0 right-0 z-50 py-3 px-4 shadow-md border-b text-white ${getPriorityStyles(currentAnnouncement.priority)}`}
       >
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-white/20 p-1.5 rounded-full">
+            <div className="bg-white/20 p-1.5 rounded-full flex-shrink-0">
               {getPriorityIcon(currentAnnouncement.priority)}
             </div>
-            <div>
-              <p className="font-medium text-sm md:text-base">{currentAnnouncement.title}</p>
-              <p className="text-sm opacity-90">{currentAnnouncement.message}</p>
+            <div className="overflow-hidden">
+              <p className="font-medium text-sm md:text-base truncate max-w-[calc(100vw-120px)] md:max-w-[calc(100vw-180px)]">
+                {currentAnnouncement.message}
+              </p>
             </div>
           </div>
           
@@ -132,7 +135,7 @@ const AnnouncementBanner: React.FC = () => {
             
             <button
               onClick={() => dismissAnnouncement(currentAnnouncement.id)}
-              className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+              className="p-1.5 hover:bg-white/20 rounded-full transition-colors flex-shrink-0"
               aria-label="Dismiss announcement"
             >
               <X className="w-4 h-4" />

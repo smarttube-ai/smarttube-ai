@@ -8,7 +8,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Pencil,
-  Star
+  Star,
+  X
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Toast from '@radix-ui/react-toast';
@@ -18,6 +19,7 @@ interface Announcement {
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high';
+  announcement_type: 'bar' | 'dialog';
   expiry_date: string;
   created_at: string;
   is_active: boolean;
@@ -27,6 +29,7 @@ interface AnnouncementFormData {
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high';
+  announcement_type: 'bar' | 'dialog';
   expiry_date: string;
   is_active: boolean;
 }
@@ -41,6 +44,7 @@ const AnnouncementsAdmin: React.FC = () => {
     title: '',
     message: '',
     priority: 'medium',
+    announcement_type: 'bar',
     expiry_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default to 7 days from now
     is_active: true
   });
@@ -110,6 +114,7 @@ const AnnouncementsAdmin: React.FC = () => {
       title: '',
       message: '',
       priority: 'medium',
+      announcement_type: 'bar',
       expiry_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       is_active: true
     });
@@ -128,6 +133,7 @@ const AnnouncementsAdmin: React.FC = () => {
       title: announcement.title,
       message: announcement.message,
       priority: announcement.priority,
+      announcement_type: announcement.announcement_type || 'bar',
       expiry_date: new Date(announcement.expiry_date).toISOString().split('T')[0],
       is_active: announcement.is_active
     });
@@ -153,6 +159,7 @@ const AnnouncementsAdmin: React.FC = () => {
             title: formData.title,
             message: formData.message,
             priority: formData.priority,
+            announcement_type: formData.announcement_type,
             expiry_date: formData.expiry_date,
             is_active: formData.is_active
           })
@@ -168,6 +175,7 @@ const AnnouncementsAdmin: React.FC = () => {
             title: formData.title,
             message: formData.message,
             priority: formData.priority,
+            announcement_type: formData.announcement_type,
             expiry_date: formData.expiry_date,
             is_active: formData.is_active
           });
@@ -277,6 +285,31 @@ const AnnouncementsAdmin: React.FC = () => {
     alert(`This announcement would appear as a popup or banner for users with title "${announcement.title}" and priority styling based on "${announcement.priority}".`);
   };
 
+  const getAnnouncementTypeBadge = (type: string) => {
+    switch (type) {
+      case 'bar':
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-green-900/30 text-green-500 flex items-center">
+            <MegaphoneIcon className="mr-1" size={12} />
+            Bar
+          </span>
+        );
+      case 'dialog':
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-purple-900/30 text-purple-500 flex items-center">
+            <ExternalLink className="mr-1" size={12} />
+            Dialog
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 text-xs rounded-full bg-gray-900/30 text-gray-500">
+            {type}
+          </span>
+        );
+    }
+  };
+
   return (
     <Toast.Provider>
       <div className="p-6">
@@ -333,6 +366,7 @@ const AnnouncementsAdmin: React.FC = () => {
                             <div className="flex items-center gap-3 mb-1">
                               <h3 className="text-lg font-semibold">{announcement.title}</h3>
                               {getPriorityBadge(announcement.priority)}
+                              {getAnnouncementTypeBadge(announcement.announcement_type || 'bar')}
                               {!active && (
                                 <span className="px-2 py-1 text-xs rounded-full bg-gray-800 text-gray-400">
                                   {expired ? 'Expired' : 'Inactive'}
@@ -394,57 +428,67 @@ const AnnouncementsAdmin: React.FC = () => {
         {/* Add/Edit Announcement Modal */}
         <Dialog.Root open={modalOpen} onOpenChange={setModalOpen}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-            <Dialog.Content className="fixed top-[50%] left-[50%] max-h-[85vh] w-[90vw] max-w-[500px] translate-x-[-50%] translate-y-[-50%] rounded-lg bg-[#121826] border border-[#2D3748] p-6 shadow-xl focus:outline-none overflow-auto">
-              <Dialog.Title className="m-0 text-xl font-bold text-white">
+            <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50" />
+            <Dialog.Content className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] bg-[#121826] rounded-lg shadow-lg p-6 z-50 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <Dialog.Title className="text-xl font-bold mb-4">
                 {currentAnnouncement ? 'Edit Announcement' : 'Create Announcement'}
               </Dialog.Title>
               
-              <form onSubmit={handleSubmit} className="mt-4">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Title
-                  </label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    className="w-full p-2 bg-[#1A2234] border border-[#2D3748] rounded-md text-white focus:ring-2 focus:ring-[#2762EB] focus:border-transparent"
-                    placeholder="e.g. New Feature Released"
-                  />
-                  {formErrors.title && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.title}</p>
-                  )}
-                </div>
-                
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Message
-                  </label>
-                  <textarea
-                    name="message"
-                    value={formData.message}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="w-full p-2 bg-[#1A2234] border border-[#2D3748] rounded-md text-white focus:ring-2 focus:ring-[#2762EB] focus:border-transparent"
-                    placeholder="Enter your announcement message here..."
-                  />
-                  {formErrors.message && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.message}</p>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-4">
+                  {/* Title field */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                    <label htmlFor="title" className="block text-sm font-medium mb-1">
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleInputChange}
+                      className={`w-full p-2 rounded bg-[#1A2234] border ${
+                        formErrors.title ? 'border-red-500' : 'border-[#2D3748]'
+                      }`}
+                      placeholder="Announcement title"
+                    />
+                    {formErrors.title && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.title}</p>
+                    )}
+                  </div>
+                  
+                  {/* Message field */}
+                  <div>
+                    <label htmlFor="message" className="block text-sm font-medium mb-1">
+                      Message
+                    </label>
+                    <textarea
+                      id="message"
+                      name="message"
+                      value={formData.message}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className={`w-full p-2 rounded bg-[#1A2234] border ${
+                        formErrors.message ? 'border-red-500' : 'border-[#2D3748]'
+                      }`}
+                      placeholder="Announcement message"
+                    />
+                    {formErrors.message && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.message}</p>
+                    )}
+                  </div>
+                  
+                  {/* Priority field */}
+                  <div>
+                    <label htmlFor="priority" className="block text-sm font-medium mb-1">
                       Priority
                     </label>
                     <select
+                      id="priority"
                       name="priority"
                       value={formData.priority}
                       onChange={handleInputChange}
-                      className="w-full p-2 bg-[#1A2234] border border-[#2D3748] rounded-md text-white focus:ring-2 focus:ring-[#2762EB] focus:border-transparent"
+                      className="w-full p-2 rounded bg-[#1A2234] border border-[#2D3748]"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -452,55 +496,88 @@ const AnnouncementsAdmin: React.FC = () => {
                     </select>
                   </div>
                   
+                  {/* Announcement Type field */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
+                    <label htmlFor="announcement_type" className="block text-sm font-medium mb-1">
+                      Display Type
+                    </label>
+                    <select
+                      id="announcement_type"
+                      name="announcement_type"
+                      value={formData.announcement_type}
+                      onChange={handleInputChange}
+                      className="w-full p-2 rounded bg-[#1A2234] border border-[#2D3748]"
+                    >
+                      <option value="bar">Bar (Top of page)</option>
+                      <option value="dialog">Dialog (Modal popup)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Bar displays a simple message at the top of the page. Dialog shows a popup with title and message.
+                    </p>
+                  </div>
+                  
+                  {/* Expiry date field */}
+                  <div>
+                    <label htmlFor="expiry_date" className="block text-sm font-medium mb-1">
                       Expiry Date
                     </label>
                     <input
                       type="date"
+                      id="expiry_date"
                       name="expiry_date"
                       value={formData.expiry_date}
                       onChange={handleInputChange}
-                      className="w-full p-2 bg-[#1A2234] border border-[#2D3748] rounded-md text-white focus:ring-2 focus:ring-[#2762EB] focus:border-transparent"
+                      className={`w-full p-2 rounded bg-[#1A2234] border ${
+                        formErrors.expiry_date ? 'border-red-500' : 'border-[#2D3748]'
+                      }`}
                     />
                     {formErrors.expiry_date && (
                       <p className="text-red-500 text-xs mt-1">{formErrors.expiry_date}</p>
                     )}
                   </div>
-                </div>
-                
-                <div className="mb-6">
-                  <label className="flex items-center">
+                  
+                  {/* Is active toggle */}
+                  <div className="flex items-center">
                     <input
                       type="checkbox"
+                      id="is_active"
                       name="is_active"
                       checked={formData.is_active}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 bg-[#1A2234] border border-[#2D3748] rounded text-[#2762EB] focus:ring-[#2762EB]"
+                      onChange={e => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                      className="mr-2"
                     />
-                    <span className="ml-2 text-sm text-gray-400">
-                      Announcement is active and visible to users
-                    </span>
-                  </label>
+                    <label htmlFor="is_active" className="text-sm">
+                      Active
+                    </label>
+                  </div>
                 </div>
                 
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end mt-6 space-x-2">
                   <Dialog.Close asChild>
                     <button
                       type="button"
-                      className="px-4 py-2 bg-[#1A2234] text-gray-300 rounded-md hover:bg-[#2D3748] focus:outline-none"
+                      className="px-4 py-2 border border-[#2D3748] rounded hover:bg-[#1A2234] transition-colors"
                     >
                       Cancel
                     </button>
                   </Dialog.Close>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-[#2762EB] text-white rounded-md hover:bg-blue-700 focus:outline-none flex items-center"
+                    className="px-4 py-2 bg-[#2762EB] text-white rounded hover:bg-[#2762EB]/90 transition-colors"
                   >
-                    {currentAnnouncement ? 'Update Announcement' : 'Create Announcement'}
+                    {currentAnnouncement ? 'Update' : 'Create'}
                   </button>
                 </div>
               </form>
+              
+              <Dialog.Close asChild>
+                <button
+                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-[#1A2234] transition-colors"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              </Dialog.Close>
             </Dialog.Content>
           </Dialog.Portal>
         </Dialog.Root>
