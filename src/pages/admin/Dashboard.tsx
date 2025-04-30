@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Link } from 'react-router-dom';
 import {
@@ -15,7 +15,8 @@ import {
   XCircle,
   AlertCircle,
   Clock3,
-  User2
+  User2,
+  RefreshCw
 } from 'lucide-react';
 
 interface StatsCard {
@@ -77,95 +78,129 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      try {
-        setLoading(true);
+  const fetchAllData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Get current date and 30 days ago for monthly comparisons
+      const today = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(today.getDate() - 60);
+      
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+      const sixtyDaysAgoStr = sixtyDaysAgo.toISOString();
+      
+      console.log('Fetching admin dashboard data...');
+      
+      // Fetch all the stats in parallel for better performance
+      const [
+        usersResult,
+        recentUsersResult,
+        plansResult
+      ] = await Promise.all([
+        // Total users count
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
         
-        // Get current date and 30 days ago for monthly comparisons
-        const today = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(today.getDate() - 60);
-        
-        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
-        const sixtyDaysAgoStr = sixtyDaysAgo.toISOString();
-        
-        // Fetch all the stats in parallel for better performance
-        const [
-          usersResult,
-          recentUsersResult,
-          plansResult
-        ] = await Promise.all([
-          // Total users count
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        // Recent users - fetch the 8 most recent users
+        supabase.from('profiles')
+          .select('id, full_name, email, avatar_url, created_at, is_admin, is_banned')
+          .order('created_at', { ascending: false })
+          .limit(8),
           
-          // Recent users - fetch the 8 most recent users
-          supabase.from('profiles')
-            .select('id, full_name, email, avatar_url, created_at, is_admin, is_banned')
-            .order('created_at', { ascending: false })
-            .limit(8),
-            
-          // Plans data
-          supabase.from('plans').select('*'),
-          
-        ]);
-        
-        // Handle errors or missing tables gracefully
-        if (usersResult.error) console.error('Error fetching users count:', usersResult.error);
-        if (recentUsersResult.error) console.error('Error fetching recent users:', recentUsersResult.error);
-        if (plansResult.error) console.error('Error fetching plans:', plansResult.error);
-        
-        // Fetch users from this month and last month for growth calculation
-        const usersThisMonthResult = await supabase.from('profiles')
-          .select('id')
-          .gte('created_at', thirtyDaysAgoStr);
-          
-        const usersLastMonthResult = await supabase.from('profiles')
-          .select('id')
-          .gte('created_at', sixtyDaysAgoStr)
-          .lt('created_at', thirtyDaysAgoStr);
-        
-        // Calculate growth rates
-        const userGrowth = calculateGrowthRate(
-          usersLastMonthResult.data?.length || 0,
-          usersThisMonthResult.data?.length || 0
-        );
-        
-        // Placeholder data for subscriptions and payments until those are implemented
-        const activePlans = plansResult.data?.filter(p => p.is_active).length || 0;
-        
-        // Set final stats with available data, use placeholders for missing data
-        setStats({
-          totalUsers: usersResult.count || 0,
-          activeSubscriptions: 0, // Placeholder
-          monthlyRevenue: 0, // Placeholder
-          avgDailyActiveUsers: Math.round((usersResult.count || 0) * 0.3), // Estimate
-          totalPlans: plansResult.data?.length || 0,
-          activePlans: activePlans,
-          totalPayments: 0, // Placeholder
-          successfulPayments: 0, // Placeholder
-          userGrowth: userGrowth,
-          revenueGrowth: 0 // Placeholder
-        });
-        
-        // Set recent users
-        setRecentUsers(recentUsersResult.data || []);
-        
-        // Placeholder for recent payments
-        setRecentPayments([]);
-        
-      } catch (error) {
-        console.error('Error fetching admin stats:', error);
-      } finally {
-        setLoading(false);
+        // Plans data
+        supabase.from('plans').select('*'),
+      ]);
+      
+      // Handle errors for each request
+      if (usersResult.error) {
+        console.error('Error fetching users count:', usersResult.error);
+        throw new Error(`Failed to fetch users: ${usersResult.error.message}`);
       }
-    };
-    
+      
+      if (recentUsersResult.error) {
+        console.error('Error fetching recent users:', recentUsersResult.error);
+        throw new Error(`Failed to fetch recent users: ${recentUsersResult.error.message}`);
+      }
+      
+      if (plansResult.error) {
+        console.error('Error fetching plans:', plansResult.error);
+        throw new Error(`Failed to fetch plans: ${plansResult.error.message}`);
+      }
+      
+      // Fetch users from this month and last month for growth calculation
+      const usersThisMonthResult = await supabase.from('profiles')
+        .select('id')
+        .gte('created_at', thirtyDaysAgoStr);
+        
+      const usersLastMonthResult = await supabase.from('profiles')
+        .select('id')
+        .gte('created_at', sixtyDaysAgoStr)
+        .lt('created_at', thirtyDaysAgoStr);
+      
+      if (usersThisMonthResult.error || usersLastMonthResult.error) {
+        console.error('Error fetching user growth data:', 
+          usersThisMonthResult.error || usersLastMonthResult.error);
+      }
+      
+      // Calculate growth rates
+      const userGrowth = calculateGrowthRate(
+        usersLastMonthResult.data?.length || 0,
+        usersThisMonthResult.data?.length || 0
+      );
+      
+      // Placeholder data for subscriptions and payments until those are implemented
+      const activePlans = plansResult.data?.filter(p => p.is_active).length || 0;
+      
+      console.log('Admin dashboard data fetched successfully.');
+      console.log('Total users:', usersResult.count);
+      console.log('Recent users:', recentUsersResult.data?.length);
+      
+      // Set final stats with available data, use placeholders for missing data
+      setStats({
+        totalUsers: usersResult.count || 0,
+        activeSubscriptions: 0, // Placeholder
+        monthlyRevenue: 0, // Placeholder
+        avgDailyActiveUsers: Math.round((usersResult.count || 0) * 0.3), // Estimate
+        totalPlans: plansResult.data?.length || 0,
+        activePlans: activePlans,
+        totalPayments: 0, // Placeholder
+        successfulPayments: 0, // Placeholder
+        userGrowth: userGrowth,
+        revenueGrowth: 0 // Placeholder
+      });
+      
+      // Set recent users
+      setRecentUsers(recentUsersResult.data || []);
+      
+      // Placeholder for recent payments
+      setRecentPayments([]);
+      
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      setError((error as Error).message || 'Failed to load dashboard data');
+      
+      // Retry logic
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying data fetch (${retryCount + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => {
+          setRetryCount(prevCount => prevCount + 1);
+        }, 2000); // Wait 2 seconds before retrying
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [retryCount]);
+  
+  useEffect(() => {
     fetchAllData();
-  }, []);
+  }, [fetchAllData]);
   
   // Helper function to calculate growth rate
   const calculateGrowthRate = (previous: number, current: number): number => {
@@ -230,6 +265,34 @@ const AdminDashboard: React.FC = () => {
         );
     }
   };
+
+  // Handle manual refresh
+  const handleRefresh = () => {
+    setRetryCount(0); // Reset retry count
+    fetchAllData();
+  };
+
+  // Display error state
+  if (error && retryCount >= MAX_RETRIES) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 text-center">
+        <div className="flex flex-col items-center justify-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-red-900/20 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h3 className="text-xl font-medium">Error Loading Dashboard</h3>
+          <p className="text-muted-foreground max-w-md">{error}</p>
+          <button
+            onClick={handleRefresh}
+            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const primaryStatsCards: StatsCard[] = [
     {

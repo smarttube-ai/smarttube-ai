@@ -15,17 +15,19 @@ import {
   Home,
   Gauge,
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 export default function AdminLayout() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [pageTitle, setPageTitle] = useState('Dashboard');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
@@ -55,6 +57,27 @@ export default function AdminLayout() {
 
   const handleSignOut = () => {
     signOut();
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Refresh the user's profile data
+      await refreshProfile();
+      
+      // Refresh the current page by forcing a navigation to the same route
+      const currentPath = location.pathname;
+      navigate('/', { replace: true });
+      setTimeout(() => {
+        navigate(currentPath, { replace: true });
+      }, 100);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 1000);
+    }
   };
 
   return (
@@ -217,7 +240,7 @@ export default function AdminLayout() {
       }`}>
         {/* Top Navigation */}
         <header className="h-16 border-b border-border bg-card sticky top-0 z-20">
-          <div className="flex items-center h-full px-4 md:px-6">
+          <div className="flex items-center justify-between h-full px-4 md:px-6">
             <div className="flex items-center gap-2">
               {/* Gradient Circle with Icon */}
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#2762EB] to-[#9333EA] flex items-center justify-center">
@@ -236,6 +259,19 @@ export default function AdminLayout() {
               >
                 {pageTitle}
               </motion.h1>
+            </div>
+            
+            {/* Right side actions */}
+            <div className="flex items-center space-x-2">
+              {/* Refresh button */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-2 rounded-full hover:bg-accent transition-colors flex items-center justify-center"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin text-blue-500' : 'text-gray-400'}`} />
+              </button>
             </div>
           </div>
         </header>
