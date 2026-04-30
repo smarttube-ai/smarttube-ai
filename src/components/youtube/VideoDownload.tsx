@@ -20,9 +20,7 @@ interface VideoDownloadProps {
 type VideoQuality = '144p' | '240p' | '360p' | '480p' | '720p' | '1080p';
 type VideoFormat = 'mp4' | 'mp3';
 
-// URL of our hypothetical backend server that handles YouTube downloads
-// In production this would be your actual backend service URL
-const API_BASE_URL = 'http://localhost:3001/api/youtube-download';
+const API_BASE_URL = import.meta.env.VITE_YOUTUBE_DOWNLOAD_API_URL || '/api/youtube-download';
 
 export default function VideoDownload({ videoData, videoId }: VideoDownloadProps) {
   const [loading, setLoading] = useState(false);
