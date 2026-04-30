@@ -8,6 +8,7 @@ interface Announcement {
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high';
+  announcement_type: 'bar' | 'dialog';
   expiry_date: string;
   created_at: string;
 }
@@ -21,8 +22,14 @@ const AnnouncementDialog: React.FC = () => {
   useEffect(() => {
     const fetchDialogAnnouncements = async () => {
       try {
-        // Use the custom function we created in the migration specifically for dialog announcements
-        const { data, error } = await supabase.rpc('get_dialog_announcements');
+        // Query table directly so UI still works if RPC functions are missing.
+        const { data, error } = await supabase
+          .from('announcements')
+          .select('id,title,message,priority,announcement_type,expiry_date,created_at')
+          .eq('is_active', true)
+          .eq('announcement_type', 'dialog')
+          .gt('expiry_date', new Date().toISOString())
+          .order('created_at', { ascending: false });
         
         if (error) throw error;
         
@@ -31,7 +38,7 @@ const AnnouncementDialog: React.FC = () => {
         const dismissedAnnouncements = storedDismissed ? JSON.parse(storedDismissed) : {};
         
         // Filter out any announcements that the user has dismissed
-        const filteredAnnouncements = data.filter(
+        const filteredAnnouncements = (data || []).filter(
           (announcement: Announcement) => !dismissedAnnouncements[announcement.id]
         );
         

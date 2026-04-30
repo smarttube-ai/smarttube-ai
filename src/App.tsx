@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import BackToTop from './components/BackToTop';
 import { Analytics } from '@vercel/analytics/react';
@@ -31,19 +31,27 @@ const PaymentsAdmin = React.lazy(() => import('./pages/admin/Payments'));
 const SettingsAdmin = React.lazy(() => import('./pages/admin/Settings'));
 const AnnouncementsAdmin = React.lazy(() => import('./pages/admin/Announcements'));
 
+function AnnouncementLayer({ user }: { user: unknown }) {
+  const location = useLocation();
+  const isUserDashboard = location.pathname.startsWith('/dashboard');
+
+  if (!user || !isUserDashboard) return null;
+
+  return (
+    <>
+      <AnnouncementBanner />
+      <AnnouncementDialog />
+    </>
+  );
+}
+
 function App() {
   const { user } = useAuth();
 
   return (
     <Router>
       <div className="min-h-screen flex flex-col">
-        {/* Show announcement components only for authenticated users */}
-        {user && (
-          <>
-            <AnnouncementBanner />
-            <AnnouncementDialog />
-          </>
-        )}
+        <AnnouncementLayer user={user} />
         
         <Suspense fallback={null}>
           <Routes>

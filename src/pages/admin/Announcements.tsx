@@ -51,8 +51,43 @@ const AnnouncementsAdmin: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof AnnouncementFormData, string>>>({});
   const [toast, setToast] = useState({ open: false, message: '', type: 'success' });
 
+  const toExpiryTimestamp = (dateString: string) => `${dateString}T23:59:59.999Z`;
+  const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS || 'hello.smarttubeai@gmail.com,mbasam313@gmail.com')
+    .split(',')
+    .map((email: string) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  const ensureCurrentUserIsAdmin = async (): Promise<boolean> => {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) return false;
+
+    const currentUser = authData.user;
+    const currentEmail = currentUser.email?.toLowerCase() || '';
+    const isConfiguredAdmin = adminEmails.includes(currentEmail);
+    if (!isConfiguredAdmin) return false;
+
+    // Ensure this user's profile has admin role flags before admin writes.
+    const { error: upsertError } = await supabase.from('profiles').upsert({
+      id: currentUser.id,
+      email: currentUser.email,
+      role: 'admin',
+      is_admin: true,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (upsertError) {
+      console.error('Failed to ensure admin role for current user:', upsertError);
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
-    fetchAnnouncements();
+    const init = async () => {
+      await ensureCurrentUserIsAdmin();
+      await fetchAnnouncements();
+    };
+    init();
   }, []);
 
   const fetchAnnouncements = async () => {
@@ -68,7 +103,8 @@ const AnnouncementsAdmin: React.FC = () => {
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error fetching announcements:', error);
-      showToast('Failed to load announcements', 'error');
+      const message = (error as { message?: string })?.message || 'Failed to load announcements';
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -151,18 +187,22 @@ const AnnouncementsAdmin: React.FC = () => {
     if (!validateForm()) return;
     
     try {
+      await ensureCurrentUserIsAdmin();
+
+      const payload = {
+        title: formData.title,
+        message: formData.message,
+        priority: formData.priority,
+        announcement_type: formData.announcement_type,
+        expiry_date: toExpiryTimestamp(formData.expiry_date),
+        is_active: formData.is_active
+      };
+
       if (currentAnnouncement) {
         // Update existing announcement
         const { error } = await supabase
           .from('announcements')
-          .update({
-            title: formData.title,
-            message: formData.message,
-            priority: formData.priority,
-            announcement_type: formData.announcement_type,
-            expiry_date: formData.expiry_date,
-            is_active: formData.is_active
-          })
+          .update(payload)
           .eq('id', currentAnnouncement.id);
         
         if (error) throw error;
@@ -171,14 +211,7 @@ const AnnouncementsAdmin: React.FC = () => {
         // Create new announcement
         const { error } = await supabase
           .from('announcements')
-          .insert({
-            title: formData.title,
-            message: formData.message,
-            priority: formData.priority,
-            announcement_type: formData.announcement_type,
-            expiry_date: formData.expiry_date,
-            is_active: formData.is_active
-          });
+          .insert(payload);
         
         if (error) throw error;
         showToast('Announcement created successfully', 'success');
@@ -188,7 +221,11 @@ const AnnouncementsAdmin: React.FC = () => {
       fetchAnnouncements();
     } catch (error) {
       console.error('Error saving announcement:', error);
-      showToast('Failed to save announcement', 'error');
+      const err = error as { message?: string; code?: string };
+      const message = err.code === '42501'
+        ? 'Permission denied: apply latest Supabase migration and re-login.'
+        : err.message || 'Failed to save announcement';
+      showToast(message, 'error');
     }
   };
 
@@ -196,6 +233,8 @@ const AnnouncementsAdmin: React.FC = () => {
     if (!currentAnnouncement) return;
     
     try {
+      await ensureCurrentUserIsAdmin();
+
       const { error } = await supabase
         .from('announcements')
         .delete()
@@ -214,6 +253,8 @@ const AnnouncementsAdmin: React.FC = () => {
 
   const toggleAnnouncementStatus = async (announcement: Announcement) => {
     try {
+      await ensureCurrentUserIsAdmin();
+
       const { error } = await supabase
         .from('announcements')
         .update({ is_active: !announcement.is_active })

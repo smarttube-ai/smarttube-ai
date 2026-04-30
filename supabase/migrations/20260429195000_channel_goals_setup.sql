@@ -2,7 +2,7 @@
 create extension if not exists "uuid-ossp";
 
 create table if not exists public.user_goals (
-  id uuid primary key default uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   category text not null check (category in ('Content', 'Growth', 'Engagement', 'Monetization')),

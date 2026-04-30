@@ -21,8 +21,14 @@ const AnnouncementBanner: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        // Use the custom function we created in the migration that specifically gets bar announcements
-        const { data, error } = await supabase.rpc('get_bar_announcements');
+        // Query table directly so UI still works if RPC functions are missing.
+        const { data, error } = await supabase
+          .from('announcements')
+          .select('id,title,message,priority,announcement_type,expiry_date,created_at')
+          .eq('is_active', true)
+          .eq('announcement_type', 'bar')
+          .gt('expiry_date', new Date().toISOString())
+          .order('created_at', { ascending: false });
         
         if (error) throw error;
         
@@ -31,7 +37,7 @@ const AnnouncementBanner: React.FC = () => {
         const dismissedAnnouncements = storedDismissed ? JSON.parse(storedDismissed) : {};
         
         // Filter out any announcements that the user has dismissed
-        const filteredAnnouncements = data.filter(
+        const filteredAnnouncements = (data || []).filter(
           (announcement: Announcement) => !dismissedAnnouncements[announcement.id]
         );
         

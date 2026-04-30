@@ -22,6 +22,16 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
+const ADMIN_EMAILS = (import.meta.env.VITE_ADMIN_EMAILS || 'hello.smarttubeai@gmail.com,mbasam313@gmail.com')
+  .split(',')
+  .map((email: string) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isPrivilegedAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -69,13 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Get user email
       const { data: userData } = await supabase.auth.getUser();
       const userEmail = userData?.user?.email;
+      const shouldBeAdmin = isPrivilegedAdminEmail(userEmail);
       
       // Set profile
       if (error) {
         console.error('Error fetching profile:', error);
-        // If no profile, but this is our admin email, create a temporary profile
-        if (userEmail === 'mbasam313@gmail.com') {
-          console.log('Creating temporary admin profile for mbasam313@gmail.com');
+        // If no profile but this user is in admin allow-list, create profile as admin.
+        if (shouldBeAdmin) {
           const tempProfile = {
             id: userId,
             email: userEmail,
@@ -97,17 +107,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
-            console.log('Inserted admin profile for mbasam313@gmail.com into database');
           } catch (insertError) {
             console.error('Error inserting profile:', insertError);
           }
         } else {
-          setProfile(null);
+          // Auto-heal missing profile rows for normal users as well.
+          try {
+            const baseProfile = {
+              id: userId,
+              email: userEmail || '',
+              role: 'user',
+              full_name: null,
+              avatar_url: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            await supabase.from('profiles').upsert(baseProfile);
+            setProfile(baseProfile);
+            cacheProfile(userId, baseProfile);
+          } catch (upsertError) {
+            console.error('Error creating missing profile:', upsertError);
+            setProfile(null);
+          }
         }
       } else {
-        // We have a profile - make sure admin email always has admin role
-        if (userEmail === 'mbasam313@gmail.com' && data.role !== 'admin') {
-          console.log('Ensuring admin role for mbasam313@gmail.com');
+        // We have a profile - ensure allowed admin emails always keep admin role.
+        if (shouldBeAdmin && data.role !== 'admin') {
           const updatedProfile = { ...data, role: 'admin' };
           setProfile(updatedProfile);
           cacheProfile(userId, updatedProfile);
@@ -115,7 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Update the role in the database
           try {
             await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
-            console.log('Updated admin role for mbasam313@gmail.com in database');
           } catch (updateError) {
             console.error('Error updating role:', updateError);
           }
@@ -125,8 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      // Log the profile for debugging
-      console.log('User profile loaded:', profile);
     } catch (error) {
       console.error('Error in profile handling:', error);
       setProfile(null);
