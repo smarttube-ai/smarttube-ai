@@ -21,19 +21,41 @@ export default async function handler(req, res) {
     }
 
     const safeName = (filename || `youtube-${videoId}`).replace(/[/\\?%*:|"<>]/g, '-');
-    const ext = format === 'mp3' || audioOnly === 'true' ? 'mp3' : 'mp4';
-
-    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
+    const wantsAudioOnly = format === 'mp3' || audioOnly === 'true';
     res.setHeader('Cache-Control', 'no-store');
+    const info = await ytdl.getInfo(url);
+    const formats = info.formats || [];
 
-    const options = {
-      quality,
-      filter: format === 'mp3' || audioOnly === 'true' ? 'audioonly' : 'audioandvideo'
-    };
+    // Map UI quality labels (e.g. "720p") to an actual downloadable format.
+    let chosenFormat;
+    if (wantsAudioOnly) {
+      const audioFormats = formats.filter((f) => f.hasAudio && !f.hasVideo);
+      chosenFormat = ytdl.chooseFormat(audioFormats, { quality: 'highestaudio' });
+    } else {
+      const progressiveMp4 = formats.filter(
+        (f) => f.hasAudio && f.hasVideo && f.container === 'mp4'
+      );
 
-    res.setHeader('Content-Type', ext === 'mp3' ? 'audio/mpeg' : 'video/mp4');
+      if (quality && quality !== 'highest') {
+        chosenFormat = progressiveMp4.find((f) => (f.qualityLabel || '').toLowerCase() === String(quality).toLowerCase());
+      }
 
-    const stream = ytdl(url, options);
+      // Fallback to highest progressive MP4 if exact quality is unavailable.
+      if (!chosenFormat) {
+        chosenFormat = ytdl.chooseFormat(progressiveMp4, { quality: 'highest' });
+      }
+    }
+
+    if (!chosenFormat) {
+      res.status(404).json({ error: 'No downloadable format found for the selected options' });
+      return;
+    }
+
+    const ext = wantsAudioOnly ? (chosenFormat.container || 'mp3') : 'mp4';
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.${ext}"`);
+    res.setHeader('Content-Type', wantsAudioOnly ? 'audio/mpeg' : 'video/mp4');
+
+    const stream = ytdl.downloadFromInfo(info, { format: chosenFormat });
     stream.on('error', (err) => {
       if (!res.headersSent) {
         res.status(500).json({ error: `Download failed: ${err.message}` });

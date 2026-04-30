@@ -14,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
 export default function SettingsPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,21 +42,30 @@ export default function SettingsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     setLoading(true);
     setError(null);
     setSuccess(false);
 
     try {
-      // Update profile
+      if (!user?.id) {
+        throw new Error('You are not logged in. Please sign in again.');
+      }
+
+      const trimmedName = formData.name.trim();
+      if (!trimmedName) {
+        throw new Error('Name cannot be empty');
+      }
+
+      // Upsert profile to handle both existing and missing rows.
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({
-          full_name: formData.name,
+        .upsert({
+          id: user.id,
+          email: user.email || formData.email || '',
+          full_name: trimmedName,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', user?.id);
+        }, { onConflict: 'id' });
 
       if (updateError) throw updateError;
 
@@ -64,6 +73,9 @@ export default function SettingsPage() {
       if (formData.newPassword) {
         if (formData.newPassword !== formData.confirmPassword) {
           throw new Error('New passwords do not match');
+        }
+        if (formData.newPassword.length < 6) {
+          throw new Error('Password must be at least 6 characters long');
         }
 
         const { error: passwordError } = await supabase.auth.updateUser({
@@ -73,6 +85,8 @@ export default function SettingsPage() {
         if (passwordError) throw passwordError;
       }
 
+      // Refresh profile cache/context so UI reflects the latest saved name.
+      await refreshProfile();
       setSuccess(true);
       // Clear password fields
       setFormData(prev => ({
