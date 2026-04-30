@@ -97,7 +97,7 @@
 }
 
 .input {
-  @apply flex h-10 w-full rounded-md border border-input bg-[#f1f5f9] dark:bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply flex h-10 w-full rounded-md border border-[#1F2937] bg-[#0A0A0A] px-3 py-2 text-sm text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#030C20] disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .button {
@@ -109,7 +109,7 @@
 }
 
 .button-secondary {
-  @apply bg-[#F1F5F9] dark:bg-secondary text-secondary-foreground hover:bg-[#E2E8F0] dark:hover:bg-secondary/80;
+  @apply bg-[#1F2937] text-white hover:bg-[#374151];
 }
 
 .button-icon {
@@ -118,7 +118,7 @@
 
 /* Tab styles */
 [role="tab"] {
-  @apply bg-[#F1F5F9] dark:bg-secondary text-gray-600 dark:text-gray-300 hover:bg-[#E2E8F0] dark:hover:bg-accent data-[state=active]:bg-white dark:data-[state=active]:bg-accent data-[state=active]:text-black dark:data-[state=active]:text-white;
+  @apply bg-[#1F2937] text-white hover:bg-[#374151] data-[state=active]:bg-white data-[state=active]:text-black;
 }
 
 /* Form element focus styles */

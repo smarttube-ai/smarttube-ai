@@ -83,9 +83,6 @@ Also, below each idea, add a simple call-to-action text:
 → Button: "Write Script for This Video"`
       };
       
-      // Log the API key (first few characters only for security)
-      console.log('API Key (first 10 chars):', apiKey.substring(0, 10) + '...');
-      
       // Try with a different model that's known to work with OpenRouter
       // OpenRouter supports various models, let's use a reliable one
       const request = {
@@ -94,10 +91,6 @@ Also, below each idea, add a simple call-to-action text:
         messages: [userMessage],
         max_tokens: 1500
       };
-      
-      console.log('Sending request to OpenRouter API...');
-      
-      console.log('Sending request with payload:', JSON.stringify(request, null, 2));
       
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -147,9 +140,6 @@ Also, below each idea, add a simple call-to-action text:
       } else if (err.message?.toLowerCase().includes('timeout')) {
         setError('Request timed out. The server might be busy, please try again.');
       } else {
-        // For debugging purposes, show more detailed error in console
-        console.warn('Detailed error:', err);
-        
         // Show a more helpful error message
         setError(`API Error: ${err.message || 'Unknown error'}. Please try again or check console for details.`);
       }

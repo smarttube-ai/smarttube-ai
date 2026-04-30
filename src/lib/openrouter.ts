@@ -112,8 +112,6 @@ Please format the script in a clean, easy-to-read format.`
         stream: false
       };
 
-      console.log(`Using model: ${MODEL}`);
-      
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {

@@ -1340,22 +1340,36 @@ export default function AiSeoTools() {
 
   return (
     <div className="flex flex-col items-center w-full">
-      {/* Horizontal scrollable tab section */}
-      <div className="w-full sticky top-0 z-10 px-4 py-6 bg-[#030C20] backdrop-blur-sm border-b border-accent/20 rounded-lg border border-primary/40 mb-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex overflow-x-auto gap-3 pb-1 px-3 py-3 bg-[#020817] rounded-lg border border-primary/30 shadow-inner custom-scrollbar mb-4 mt-2">
+      <div className="w-full px-4 py-4 mb-2">
+        <div className="w-full">
+          <div className="md:hidden">
+            <label className="block text-sm font-medium mb-2">Select Tool</label>
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="input w-full"
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
+          <div className="hidden md:flex overflow-x-auto gap-2 pb-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`button ${
-                  activeTab === tab.id ? 'button-primary bg-[#030C20]' : 'button-secondary bg-[#030C20]'
-                } whitespace-nowrap flex-shrink-0 transition-all shadow-md hover:shadow-lg mx-1 border border-white/20`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.id
+                    ? 'bg-white text-black'
+                    : 'bg-[#1F2937] text-white hover:bg-[#374151]'
+                }`}
               >
-                <tab.icon className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                <tab.icon className="w-4 h-4" />
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
@@ -1363,7 +1377,7 @@ export default function AiSeoTools() {
       </div>
 
       {/* Fixed-width responsive tool container */}
-      <div className="w-full max-w-4xl mx-auto px-4 py-6 overflow-visible mt-4">
+      <div className="w-full px-4 py-6 overflow-visible">
         <div className="w-full overflow-y-auto overflow-x-hidden rounded-lg border border-accent/20 shadow-lg bg-[#030C20]">
 
           {renderContent()}

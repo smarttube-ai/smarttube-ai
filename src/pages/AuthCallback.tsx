@@ -20,8 +20,6 @@ export default function AuthCallback() {
             return params;
           }, {} as Record<string, string>);
 
-        console.log('Auth callback URL hash params:', hashParams);
-        
         // Check for specific types
         const type = hashParams.type;
         const accessToken = hashParams.access_token;
@@ -36,27 +34,19 @@ export default function AuthCallback() {
           return;
         }
         
-        console.log('Auth callback session data:', data);
-        
         // Handle different auth scenarios
         if (type === 'recovery' || window.location.href.includes('reset-password')) {
-          console.log('Password reset flow detected, redirecting to reset-password');
           navigate('/reset-password', { replace: true });
         } else if (type === 'signup' || type === 'email_confirmation') {
-          console.log('Email confirmation flow detected');
           // If the user has a valid session, redirect to dashboard, otherwise to login
           if (data?.session?.user) {
-            console.log('User has valid session, redirecting to dashboard');
             navigate('/dashboard', { replace: true });
           } else {
-            console.log('Email confirmed but no session, redirecting to login');
             navigate('/login', { replace: true });
           }
         } else if (accessToken || data?.session?.access_token) {
-          console.log('Access token detected, redirecting to dashboard');
           navigate('/dashboard', { replace: true });
         } else {
-          console.log('No specific auth flow detected, redirecting to home page');
           navigate('/', { replace: true });
         }
       } catch (err) {

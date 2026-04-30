@@ -3,10 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-// Using a type import for TypeScript support
-import type { CreateTypes } from 'canvas-confetti';
-// Will dynamically import at runtime
-declare const confetti: CreateTypes;
 
 // Add toast utility function since it's missing
 const toast = ({ title, description, status }: { title: string; description: string; status: string }) => {
@@ -173,6 +169,13 @@ function ChannelGoals(): JSX.Element {
           status: 'pending' as const
         };
         setGoals(prev => [newGoalWithId, ...prev]);
+        setNewGoal({
+          title: '',
+          category: 'Content',
+          target_value: 0,
+          deadline: ''
+        });
+        setIsModalOpen(false);
         
         toast({
           title: 'Goal added',
