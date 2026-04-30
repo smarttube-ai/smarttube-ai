@@ -40,7 +40,4 @@ AFTER INSERT ON auth.users
 FOR EACH ROW
 EXECUTE FUNCTION ensure_admin_access();
 
--- Log that this migration ran
-INSERT INTO _migrations (name, applied_at)
-VALUES ('20250410125000_fix_admin.sql', NOW())
-ON CONFLICT (name) DO NOTHING; 
+-- No-op: Supabase migration history is already tracked by schema_migrations.

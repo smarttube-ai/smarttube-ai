@@ -1,6 +1,6 @@
 -- Create announcements table
 CREATE TABLE IF NOT EXISTS announcements (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   message TEXT NOT NULL,
   priority TEXT NOT NULL DEFAULT 'medium',
@@ -22,12 +22,14 @@ CREATE INDEX IF NOT EXISTS idx_announcements_type ON announcements(announcement_
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 
 -- Admin can do everything with announcements
+DROP POLICY IF EXISTS admin_manage_announcements ON announcements;
 CREATE POLICY admin_manage_announcements ON announcements
   FOR ALL
   TO authenticated
   USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
 
 -- All authenticated users can view active announcements
+DROP POLICY IF EXISTS view_active_announcements ON announcements;
 CREATE POLICY view_active_announcements ON announcements
   FOR SELECT
   TO authenticated

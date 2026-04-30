@@ -1,3 +1,7 @@
+-- Ensure UUID helper function exists before table creation.
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS user_plans CASCADE;
 DROP TABLE IF EXISTS plans CASCADE;
@@ -5,7 +9,7 @@ DROP TABLE IF EXISTS feature_limits CASCADE;
 
 -- Create plans table
 CREATE TABLE plans (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   price NUMERIC NOT NULL DEFAULT 0,
   features JSONB NOT NULL DEFAULT '{}',
@@ -17,7 +21,7 @@ CREATE TABLE plans (
 
 -- Create feature_limits table
 CREATE TABLE feature_limits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   key TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
@@ -88,6 +92,11 @@ CREATE POLICY view_own_user_plan ON user_plans
   FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
+
+-- Ensure function recreation does not fail on parameter name mismatch.
+DROP FUNCTION IF EXISTS get_user_plan(UUID);
+DROP FUNCTION IF EXISTS get_user_feature_limit(TEXT, UUID);
+DROP FUNCTION IF EXISTS check_user_feature_limit(TEXT, UUID);
 
 -- Create or replace get_user_plan function
 CREATE OR REPLACE FUNCTION get_user_plan(user_id UUID DEFAULT auth.uid())

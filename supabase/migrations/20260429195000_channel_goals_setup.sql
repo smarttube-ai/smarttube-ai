@@ -1,8 +1,9 @@
 -- Channel goals and badges tables used by dashboard goal tracking.
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 create table if not exists public.user_goals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   category text not null check (category in ('Content', 'Growth', 'Engagement', 'Monetization')),
@@ -69,7 +70,7 @@ end
 $$;
 
 create table if not exists public.user_badges (
-  badge_id uuid primary key default uuid_generate_v4(),
+  badge_id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   badge_name text not null,
   awarded_at timestamptz not null default now()

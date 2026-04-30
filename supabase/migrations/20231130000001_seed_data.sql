@@ -10,7 +10,8 @@ INSERT INTO feature_limits (key, name, description, default_value) VALUES
 ('Video Hook Generator', 'Video Hook Generator', 'Number of video hooks that can be generated per month', 10),
 ('Title A/B Tester', 'Title A/B Tester', 'Number of title A/B tests per month', 10),
 ('Description Optimizer', 'Description Optimizer', 'Number of descriptions that can be optimized per month', 10),
-('Support', 'Customer Support Level', '0 = No Support, 1 = Email/Chat, 2 = 24/7 Priority', 0);
+('Support', 'Customer Support Level', '0 = No Support, 1 = Email/Chat, 2 = 24/7 Priority', 0)
+ON CONFLICT (key) DO NOTHING;
 
 -- Insert default plans
 INSERT INTO plans (name, price, features, is_active, description) VALUES
@@ -57,8 +58,8 @@ INSERT INTO plans (name, price, features, is_active, description) VALUES
 }', true, 'Best for Professional Creators Needing Unlimited Access.');
 
 -- Create a usage tracking table for feature usage
-CREATE TABLE feature_usage (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS feature_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   feature_key TEXT NOT NULL,
   used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -66,29 +67,49 @@ CREATE TABLE feature_usage (
 );
 
 -- Create index for faster lookup of usage by user and feature
-CREATE INDEX idx_feature_usage_user_feature ON feature_usage(user_id, feature_key);
-CREATE INDEX idx_feature_usage_month ON feature_usage(used_at);
+CREATE INDEX IF NOT EXISTS idx_feature_usage_user_feature ON feature_usage(user_id, feature_key);
+CREATE INDEX IF NOT EXISTS idx_feature_usage_month ON feature_usage(used_at);
 
 -- Enable RLS on feature_usage
 ALTER TABLE feature_usage ENABLE ROW LEVEL SECURITY;
 
 -- Admin can see all feature usage
-CREATE POLICY admin_all_feature_usage ON feature_usage
-  FOR ALL
-  TO authenticated
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'feature_usage' AND policyname = 'admin_all_feature_usage'
+  ) THEN
+    CREATE POLICY admin_all_feature_usage ON feature_usage
+      FOR ALL
+      TO authenticated
+      USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+  END IF;
 
--- Users can see their own usage
-CREATE POLICY view_own_feature_usage ON feature_usage
-  FOR SELECT
-  TO authenticated
-  USING (user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'feature_usage' AND policyname = 'view_own_feature_usage'
+  ) THEN
+    CREATE POLICY view_own_feature_usage ON feature_usage
+      FOR SELECT
+      TO authenticated
+      USING (user_id = auth.uid());
+  END IF;
 
--- Users can create their own usage entries
-CREATE POLICY insert_own_feature_usage ON feature_usage
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'feature_usage' AND policyname = 'insert_own_feature_usage'
+  ) THEN
+    CREATE POLICY insert_own_feature_usage ON feature_usage
+      FOR INSERT
+      TO authenticated
+      WITH CHECK (user_id = auth.uid());
+  END IF;
+END
+$$;
+
+DROP FUNCTION IF EXISTS use_feature(TEXT, JSONB);
+DROP FUNCTION IF EXISTS get_feature_usage(TEXT, UUID);
 
 -- Create or replace function to check and track feature usage
 CREATE OR REPLACE FUNCTION use_feature(feature_key TEXT, metadata JSONB DEFAULT '{}')

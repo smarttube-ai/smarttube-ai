@@ -14,6 +14,59 @@ import {
 } from 'lucide-react';
 import { getApiKey } from '../lib/openrouter';
 
+const DEFAULT_OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const ENV_OPENROUTER_ENDPOINT = import.meta.env.VITE_OPENROUTER_ENDPOINT;
+const OPENROUTER_ENDPOINT =
+  typeof ENV_OPENROUTER_ENDPOINT === 'string' &&
+  ENV_OPENROUTER_ENDPOINT.includes('/api/v1/chat/completions')
+    ? ENV_OPENROUTER_ENDPOINT
+    : DEFAULT_OPENROUTER_ENDPOINT;
+const ENV_OPENROUTER_MODEL = import.meta.env.VITE_OPENROUTER_MODEL;
+const OPENROUTER_MODEL = ENV_OPENROUTER_MODEL || 'openrouter/free';
+const OPENROUTER_FALLBACK_MODELS = (
+  import.meta.env.VITE_OPENROUTER_FALLBACK_MODELS || 'google/gemma-4-31b-it:free'
+)
+  .split(',')
+  .map((m: string) => m.trim())
+  .filter(Boolean);
+
+async function callOpenRouterWithFallback(
+  apiKey: string,
+  messages: Array<{ role: string; content: string }>,
+  options?: { temperature?: number; max_tokens?: number }
+) {
+  const modelCandidates = ['openrouter/free', OPENROUTER_MODEL, ...OPENROUTER_FALLBACK_MODELS];
+  let lastError: unknown = null;
+
+  for (const model of modelCandidates) {
+    const response = await fetch(OPENROUTER_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'SmartTube AI'
+      },
+      body: JSON.stringify({
+        model,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.max_tokens,
+        messages
+      })
+    });
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    const errorText = await response.text();
+    lastError = new Error(`API Error (${response.status}): ${errorText}`);
+    console.warn(`OpenRouter model failed (${model})`, lastError);
+  }
+
+  throw lastError || new Error('All free OpenRouter models failed');
+}
+
 function TitleGenerator() {
   const [input, setInput] = useState({
     title: '',
@@ -36,7 +89,7 @@ function TitleGenerator() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -45,7 +98,7 @@ function TitleGenerator() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {
@@ -223,21 +276,12 @@ function DescriptionGenerator() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'SmartTube AI'
-        },
-        body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
-          temperature: 0.7,
-          messages: [
-            {
-              role: 'user',
-              content: `You are a YouTube SEO expert and content writer. Generate an SEO-optimized YouTube video description based on the following details:
+      const data = await callOpenRouterWithFallback(
+        apiKey,
+        [
+          {
+            role: 'user',
+            content: `You are a YouTube SEO expert and content writer. Generate an SEO-optimized YouTube video description based on the following details:
 
 Video Title: ${input.title}
 Keywords: ${input.keywords}
@@ -250,20 +294,13 @@ Instructions:
 - Add a brief call-to-action near the end
 - Keep it human-sounding, no robotic phrases
 - Match the description length to the provided word count
+- Do NOT include hashtags in any form
 
 Return only the final description.`
-            }
-          ]
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error generating description:', errorText);
-        throw new Error('Failed to generate description');
-      }
-      
-      const data = await response.json();
+          }
+        ],
+        { temperature: 0.7 }
+      );
       
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No description received from the AI model');
@@ -275,26 +312,11 @@ Return only the final description.`
       // Remove formatting characters
       content = content.replace(/^\\boxed\{|```python|```|\[|\]|\}/g, '');
       
-      // Process the content to extract description
-      // Split by spaces or newlines
-      const words = content
-        .split(/[\s\n]+/)
-        .filter((word: string) => word.trim().length > 0)
-        .map((word: string) => {
-          // Clean each word
-          let cleaned = word.trim();
-          // Remove quotes
-          cleaned = cleaned.replace(/"|'/g, '');
-          // Remove commas
-          cleaned = cleaned.replace(/,/g, '');
-          // Ensure it starts with only one #
-          cleaned = cleaned.replace(/^#+/, '');
-          cleaned = cleaned.replace(/^/, '#');
-          return cleaned;
-        });
-      
-      // Filter out any empty or invalid descriptions
-      const validDescription = words.join(' ');
+      // Clean markdown wrappers and strip hashtags from output.
+      const validDescription = content
+        .replace(/(^|\s)#[A-Za-z0-9_]+/g, '$1')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
       
       if (validDescription.length > 0) {
         setDescription(validDescription);
@@ -424,7 +446,7 @@ function HashtagGenerator() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -433,7 +455,7 @@ function HashtagGenerator() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {
@@ -583,7 +605,7 @@ function KeywordIdeasGenerator() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -592,7 +614,7 @@ function KeywordIdeasGenerator() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {
@@ -758,7 +780,7 @@ function VideoHookGenerator() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -767,7 +789,7 @@ function VideoHookGenerator() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {
@@ -945,7 +967,7 @@ function TitleABTester() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -954,7 +976,7 @@ function TitleABTester() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {
@@ -1155,7 +1177,7 @@ function DescriptionOptimizer() {
         throw new Error('OpenRouter API key not found');
       }
       
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(OPENROUTER_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -1164,7 +1186,7 @@ function DescriptionOptimizer() {
           'X-Title': 'SmartTube AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-zero:free',
+          model: OPENROUTER_MODEL,
           temperature: 0.7,
           messages: [
             {

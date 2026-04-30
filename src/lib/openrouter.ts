@@ -36,8 +36,16 @@ export interface VideoIdea {
   marketingAngles: string[];
 }
 
-// Using only Deepseek R1 Zero model as it's free
-const MODEL = 'deepseek/deepseek-r1-zero:free';
+// Keep defaults on free OpenRouter-compatible models.
+const MODEL = import.meta.env.VITE_OPENROUTER_MODEL || 'openrouter/free';
+const FALLBACK_MODEL = import.meta.env.VITE_OPENROUTER_FALLBACK_MODEL || 'google/gemma-4-31b-it:free';
+const DEFAULT_OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const ENV_OPENROUTER_ENDPOINT = import.meta.env.VITE_OPENROUTER_ENDPOINT;
+const OPENROUTER_ENDPOINT =
+  typeof ENV_OPENROUTER_ENDPOINT === 'string' &&
+  ENV_OPENROUTER_ENDPOINT.includes('/api/v1/chat/completions')
+    ? ENV_OPENROUTER_ENDPOINT
+    : DEFAULT_OPENROUTER_ENDPOINT;
 
 // Get API key from environment or database
 export const getApiKey = async (): Promise<string> => {
@@ -105,31 +113,40 @@ Please format the script in a clean, easy-to-read format.`
     };
 
     try {
-      const request: OpenRouterRequest = {
-        model: MODEL,
-        temperature: 0.7,
-        messages: [systemMessage, userMessage],
-        stream: false
+      const tryModel = async (model: string) => {
+        const request: OpenRouterRequest = {
+          model,
+          temperature: 0.7,
+          messages: [systemMessage, userMessage],
+          stream: false
+        };
+
+        const response = await fetch(OPENROUTER_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'SmartTube AI'
+          },
+          body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
+
+        return response.json() as Promise<OpenRouterResponse>;
       };
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'SmartTube AI'
-        },
-        body: JSON.stringify(request)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error with model ${MODEL}:`, errorText);
-        throw new Error(errorText);
+      let data: OpenRouterResponse;
+      try {
+        data = await tryModel(MODEL);
+      } catch (primaryError) {
+        console.warn(`Primary model failed (${MODEL}), retrying with ${FALLBACK_MODEL}.`, primaryError);
+        data = await tryModel(FALLBACK_MODEL);
       }
-
-      const data = await response.json() as OpenRouterResponse;
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response received from the AI model');
       }

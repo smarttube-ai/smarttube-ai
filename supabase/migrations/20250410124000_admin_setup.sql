@@ -21,7 +21,7 @@ BEGIN
       is_super_admin,
       encrypted_password
     ) VALUES (
-      uuid_generate_v4(),
+      gen_random_uuid(),
       'mbasam313@gmail.com',
       NOW(),
       NOW(),

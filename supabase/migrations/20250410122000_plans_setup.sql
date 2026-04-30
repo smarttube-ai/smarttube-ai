@@ -1,6 +1,6 @@
 -- Create the plans table
 CREATE TABLE IF NOT EXISTS plans (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   price NUMERIC NOT NULL DEFAULT 0,
   features JSONB NOT NULL DEFAULT '{}',
@@ -14,7 +14,7 @@ CREATE INDEX IF NOT EXISTS plans_is_active_idx ON plans (is_active);
 
 -- Create the user_plans table
 CREATE TABLE IF NOT EXISTS user_plans (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE RESTRICT,
   expiry DATE,
@@ -33,14 +33,16 @@ CREATE INDEX IF NOT EXISTS user_plans_expiry_idx ON user_plans (expiry);
 ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
 
 -- Everyone can view active plans
+DROP POLICY IF EXISTS "Everyone can view active plans" ON plans;
 CREATE POLICY "Everyone can view active plans" ON plans
   FOR SELECT USING (is_active = true);
 
 -- Only admins can manage plans
+DROP POLICY IF EXISTS "Admins can manage plans" ON plans;
 CREATE POLICY "Admins can manage plans" ON plans
   FOR ALL USING (
     auth.uid() IN (
-      SELECT user_id FROM profiles WHERE role = 'admin'
+      SELECT id FROM profiles WHERE role = 'admin'
     )
   );
 
@@ -48,14 +50,16 @@ CREATE POLICY "Admins can manage plans" ON plans
 ALTER TABLE user_plans ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own plan
+DROP POLICY IF EXISTS "Users can view their own plan" ON user_plans;
 CREATE POLICY "Users can view their own plan" ON user_plans
   FOR SELECT USING (auth.uid() = user_id);
 
 -- Admins can manage all user plans
+DROP POLICY IF EXISTS "Admins can manage all user plans" ON user_plans;
 CREATE POLICY "Admins can manage all user plans" ON user_plans
   FOR ALL USING (
     auth.uid() IN (
-      SELECT user_id FROM profiles WHERE role = 'admin'
+      SELECT id FROM profiles WHERE role = 'admin'
     )
   );
 
@@ -69,6 +73,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to update updated_at on update
+DROP TRIGGER IF EXISTS update_user_plans_updated_at ON user_plans;
 CREATE TRIGGER update_user_plans_updated_at
 BEFORE UPDATE ON user_plans
 FOR EACH ROW
@@ -83,7 +88,7 @@ VALUES
 
 -- Create or update feature_limits table if not created yet
 CREATE TABLE IF NOT EXISTS feature_limits (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   key TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   description TEXT,
@@ -96,14 +101,16 @@ CREATE TABLE IF NOT EXISTS feature_limits (
 ALTER TABLE feature_limits ENABLE ROW LEVEL SECURITY;
 
 -- Everyone can view feature limits
+DROP POLICY IF EXISTS "Everyone can view feature limits" ON feature_limits;
 CREATE POLICY "Everyone can view feature limits" ON feature_limits
   FOR SELECT USING (true);
 
 -- Only admins can manage feature limits
+DROP POLICY IF EXISTS "Admins can manage feature limits" ON feature_limits;
 CREATE POLICY "Admins can manage feature limits" ON feature_limits
   FOR ALL USING (
     auth.uid() IN (
-      SELECT user_id FROM profiles WHERE role = 'admin'
+      SELECT id FROM profiles WHERE role = 'admin'
     )
   );
 

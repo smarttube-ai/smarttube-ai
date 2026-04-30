@@ -9,6 +9,21 @@ import {
 } from 'lucide-react';
 import { getApiKey } from '../lib/openrouter';
 
+const DEFAULT_OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const ENV_OPENROUTER_ENDPOINT = import.meta.env.VITE_OPENROUTER_ENDPOINT;
+const OPENROUTER_ENDPOINT =
+  typeof ENV_OPENROUTER_ENDPOINT === 'string' &&
+  ENV_OPENROUTER_ENDPOINT.includes('/api/v1/chat/completions')
+    ? ENV_OPENROUTER_ENDPOINT
+    : DEFAULT_OPENROUTER_ENDPOINT;
+const ENV_OPENROUTER_MODEL = import.meta.env.VITE_OPENROUTER_MODEL;
+const OPENROUTER_FALLBACK_MODELS = (
+  import.meta.env.VITE_OPENROUTER_FALLBACK_MODELS || 'google/gemma-4-31b-it:free'
+)
+  .split(',')
+  .map((m: string) => m.trim())
+  .filter(Boolean);
+
 export default function IdeationSection() {
   const [channelUrl, setChannelUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,35 +98,46 @@ Also, below each idea, add a simple call-to-action text:
 → Button: "Write Script for This Video"`
       };
       
-      // Try with a different model that's known to work with OpenRouter
-      // OpenRouter supports various models, let's use a reliable one
-      const request = {
-        model: "deepseek/deepseek-r1-zero:free",
-        temperature: 0.7,
-        messages: [userMessage],
-        max_tokens: 1500
-      };
-      
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'SmartTube AI'
-        },
-        body: JSON.stringify(request)
-      });
-      
-      if (!response.ok) {
+      const modelCandidates = [
+        'openrouter/free',
+        ...(ENV_OPENROUTER_MODEL ? [ENV_OPENROUTER_MODEL] : []),
+        ...OPENROUTER_FALLBACK_MODELS
+      ];
+      let lastError: unknown = null;
+      let data: any = null;
+
+      for (const model of modelCandidates) {
+        const request = {
+          model,
+          temperature: 0.7,
+          messages: [userMessage],
+          max_tokens: 1500
+        };
+
+        const response = await fetch(OPENROUTER_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'SmartTube AI'
+          },
+          body: JSON.stringify(request)
+        });
+
+        if (response.ok) {
+          data = await response.json();
+          break;
+        }
+
         const errorText = await response.text();
-        console.error('Error from OpenRouter API:', errorText);
-        console.error('Response status:', response.status);
-        console.error('Response headers:', Object.fromEntries([...response.headers.entries()]));
-        throw new Error(`API Error (${response.status}): ${errorText}`);
+        lastError = new Error(`API Error (${response.status}): ${errorText}`);
+        console.warn(`OpenRouter model failed (${model})`, lastError);
       }
-      
-      const data = await response.json();
+
+      if (!data) {
+        throw lastError || new Error('All free OpenRouter models failed');
+      }
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response received from the AI model');
       }
@@ -132,9 +158,9 @@ Also, below each idea, add a simple call-to-action text:
       if (err.message?.includes('401')) {
         setError('API Key is invalid or expired. Please check your OpenRouter API key in the .env file.');
       } else if (err.message?.includes('429')) {
-        setError('Rate limit exceeded. Please try again later.');
+        setError('Free model rate limit reached. Please retry in a moment.');
       } else if (err.message?.includes('404')) {
-        setError('API endpoint not found. Please check your network connection.');
+        setError('Free models are currently unavailable on OpenRouter for this request. Please retry.');
       } else if (err.message?.includes('model_not_found')) {
         setError('The AI model is currently unavailable. Please try again later.');
       } else if (err.message?.toLowerCase().includes('timeout')) {
