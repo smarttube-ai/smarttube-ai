@@ -63,41 +63,47 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <motion.div 
-            className="flex items-center space-x-3 cursor-pointer"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={handleLogoClick}
-          >
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#2762EB] to-[#9333EA] flex items-center justify-center">
-              <Youtube className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white font-montserrat">SmartTube AI</span>
-          </motion.div>
+          <div className="flex-1 flex justify-start">
+            <motion.div 
+              className="flex items-center space-x-3 cursor-pointer"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={handleLogoClick}
+            >
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-[#2762EB] to-[#9333EA] flex items-center justify-center">
+                <Youtube className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-2xl font-bold text-white tracking-tight">SmartTube AI</span>
+            </motion.div>
+          </div>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex flex-[2] justify-center items-center space-x-8">
             {location.pathname === '/' && menuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className="text-base font-medium text-gray-300 hover:text-white transition-colors"
+                className="text-sm font-medium text-slate-300 hover:text-white transition-colors tracking-wide"
               >
                 {item.label}
               </button>
             ))}
+          </div>
+
+          {/* Desktop Launch Button */}
+          <div className="hidden md:flex flex-1 justify-end items-center">
             <motion.button
               onClick={handleLaunchApp}
-              className="px-6 py-2.5 rounded-lg font-medium text-white bg-gradient-to-r from-[#2762EB] to-[#9333EA] hover:shadow-lg hover:shadow-primary/20 transition-all"
+              className="px-6 py-2.5 rounded-full font-semibold text-white bg-gradient-to-r from-[#2762EB] to-[#9333EA] hover:shadow-[0_0_20px_rgba(39,98,235,0.4)] transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              {user ? 'Launch App' : 'Get Started'}
+              Launch App
             </motion.button>
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center justify-end flex-1">
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="text-gray-300 hover:text-white"
@@ -133,7 +139,7 @@ export default function Navbar() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                {user ? 'Launch App' : 'Get Started'}
+                Launch App
               </motion.button>
             </div>
           </motion.div>
